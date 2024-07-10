@@ -33,6 +33,11 @@ from scipy import interpolate
 from lsy_drone_racing.command import Command
 from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
+#from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
+from lsy_drone_racing.normalized_class import TrajGen
+from lsy_drone_racing.geometry import create_cylinder
+
+
 
 
 class Controller(BaseController):
@@ -53,8 +58,9 @@ class Controller(BaseController):
             constants, counters, pre-plan trajectories, etc.
 
         Args:
-            initial_obs: The initial observation of the quadrotor's state
-                [x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p, q, r].
+            initial_obs: The initial observation of the environment's state. Consists of
+                [drone_xyz_yaw, gates_xyz_yaw, gates_in_range, obstacles_xyz, obstacles_in_range,
+                gate_id]
             initial_info: The a priori information as a dictionary with keys 'symbolic_model',
                 'nominal_physical_parameters', 'nominal_gates_pos_and_type', etc.
             buffer_size: Size of the data buffers used in method `learn()`.
@@ -67,6 +73,7 @@ class Controller(BaseController):
         self.initial_obs = initial_obs
         self.VERBOSE = verbose
         self.BUFFER_SIZE = buffer_size
+        self.run_opt = False
 
         # Store a priori scenario information.
         self.NOMINAL_GATES = initial_info["nominal_gates_pos_and_type"]
@@ -79,40 +86,17 @@ class Controller(BaseController):
         #########################
         # REPLACE THIS (START) ##
         #########################
-
-        # Example: Hard-code waypoints through the gates. Obviously this is a crude way of
-        # completing the challenge that is highly susceptible to noise and does not generalize at
-        # all. It is meant solely as an example on how the drones can be controlled
         waypoints = []
         waypoints.append([self.initial_obs[0], self.initial_obs[2], 0.3])
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
         waypoints.append([1, 0, z_low])
-        waypoints.append([gates[0][0] + 0.2, gates[0][1] + 0.1, z_low])
-        waypoints.append([gates[0][0] + 0.1, gates[0][1], z_low])
-        waypoints.append([gates[0][0] - 0.1, gates[0][1], z_low])
-        waypoints.append(
-            [
-                (gates[0][0] + gates[1][0]) / 2 - 0.7,
-                (gates[0][1] + gates[1][1]) / 2 - 0.3,
-                (z_low + z_high) / 2,
-            ]
-        )
-        waypoints.append(
-            [
-                (gates[0][0] + gates[1][0]) / 2 - 0.5,
-                (gates[0][1] + gates[1][1]) / 2 - 0.6,
-                (z_low + z_high) / 2,
-            ]
-        )
-        waypoints.append([gates[1][0] - 0.3, gates[1][1] - 0.2, z_high])
-        waypoints.append([gates[1][0] + 0.2, gates[1][1] + 0.2, z_high])
-        waypoints.append([gates[2][0], gates[2][1] - 0.4, z_low])
-        waypoints.append([gates[2][0], gates[2][1] + 0.1, z_low])
-        waypoints.append([gates[2][0], gates[2][1] + 0.1, z_high + 0.2])
-        waypoints.append([gates[3][0], gates[3][1] + 0.1, z_high])
-        waypoints.append([gates[3][0], gates[3][1] - 0.1, z_high + 0.1])
+        waypoints.append([gates[0][0] , gates[0][1], z_low])
+        waypoints.append([gates[1][0], gates[1][1], z_high])
+        waypoints.append([gates[2][0], gates[2][1], z_low])
+
+        waypoints.append([gates[3][0], gates[3][1] , z_high])
         waypoints.append(
             [
                 initial_info["x_reference"][0],
@@ -122,17 +106,52 @@ class Controller(BaseController):
         )
         waypoints = np.array(waypoints)
 
+        #Obstacles
+        obstacle_height = 0.6
+        obstacle_radius = 0.15
+        grid = (120,100,120)
+        cyl1 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[0][0],self.NOMINAL_OBSTACLES[0][1], self.NOMINAL_OBSTACLES[0][2]), obstacle_radius, obstacle_height)
+        cyl2 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[1][0],self.NOMINAL_OBSTACLES[1][1], self.NOMINAL_OBSTACLES[1][2]), obstacle_radius, obstacle_height)
+        cyl3 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[2][0],self.NOMINAL_OBSTACLES[2][1], self.NOMINAL_OBSTACLES[2][2]), obstacle_radius, obstacle_height)
+        cyl4 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[3][0],self.NOMINAL_OBSTACLES[3][1], self.NOMINAL_OBSTACLES[3][2]), obstacle_radius, obstacle_height)
+        obstacles = np.array([cyl1,cyl2,cyl3,cyl4])
+        t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
+        duration = 14
+        t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
+        tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
+        trajectory = interpolate.splev(t, tck)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=1500,alpha=0.15,use_initial=False)
+        print("Trajectory object created")
+        self.run_opt = True
+        if self.run_opt:
+            optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
+            print(optimized_trajectory)
+            #Save final trajectory
+            print("Hej")
+            traj_gen.save_trajectory('optimized_trajectory.csv')
+            current_traj = traj_gen.give_current()
+            self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
+        
+        else:
+            filename = "optimized_trajectory.csv"
+            optimized_trajectory = np.loadtxt(filename, delimiter=',')
+            current_traj = optimized_trajectory
+            self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
+   
+        print("Here is info: ", initial_info.keys, self.NOMINAL_GATES)
+        print("DIMS: ", initial_info["gate_dimensions"])
+        #DOVUL!!!!
+
+
+        # Example: Hard-code waypoints through the gates. Obviously this is a crude way of
+        # completing the challenge that is highly susceptible to noise and does not generalize at
+        # all. It is meant solely as an example on how the drones can be controlled
+        
+
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         self.waypoints = waypoints
-        duration = 12
-        t = np.linspace(0, 1, int(duration * self.CTRL_FREQ))
-        trajectory = interpolate.splev(t, tck)
-        print("Trajectory type:",type(trajectory))
-        print(type(trajectory[0]))
-        print(trajectory[0].shape)
-        print("Trajectory", trajectory)
+
         
-        self.ref_x, self.ref_y, self.ref_z = interpolate.splev(t, tck)
         assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
 
         if self.VERBOSE:
@@ -163,7 +182,8 @@ class Controller(BaseController):
 
         Args:
             ep_time: Episode's elapsed time, in seconds.
-            obs: The quadrotor's Vicon data [x, 0, y, 0, z, 0, phi, theta, psi, 0, 0, 0].
+            obs: The environment's observation [drone_xyz_yaw, gates_xyz_yaw, gates_in_range,
+                obstacles_xyz, obstacles_in_range, gate_id].
             reward: The reward signal.
             done: Wether the episode has terminated.
             info: Current step information as a dictionary with keys 'constraint_violation',
@@ -177,6 +197,12 @@ class Controller(BaseController):
         #########################
         # REPLACE THIS (START) ##
         #########################
+
+        #DOVUL OBS 
+       
+        # DOVUL OBS END
+
+
 
         # Handcrafted solution for getting_stated scenario.
 

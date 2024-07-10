@@ -29,11 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 def simulate(
-    config: str = "config/getting_started.yaml",
-    controller: str = "examples/controller.py",
+    config: str = "config/level0.yaml",
+    controller: str = "examples/controller copy.py",
     n_runs: int = 1,
     gui: bool = True,
-    terminate_on_lap: bool = True,
+    terminate_on_lap: bool = False,
 ) -> list[float]:
     """Evaluate the drone controller over multiple episodes.
 

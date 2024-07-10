@@ -75,6 +75,15 @@ class Controller(BaseController):
         # Reset counters and buffers.
         self.reset()
         self.episode_reset()
+        
+        # PID parameters
+        self.kp = np.array([0.4, 0.4, 0.6])  # Proportional gains for x, y, z
+        self.ki = np.array([0.05, 0.05, 0.1])  # Integral gains for x, y, z
+        self.kd = np.array([0.2, 0.2, 0.3])  # Derivative gains for x, y, z
+
+        # Error accumulators
+        self.integral_error = np.zeros(3)
+        self.prev_error = np.zeros(3)
 
         #########################
         # REPLACE THIS (START) ##
@@ -154,31 +163,8 @@ class Controller(BaseController):
         done: bool | None = None,
         info: dict | None = None,
     ) -> tuple[Command, list]:
-        """Pick command sent to the quadrotor through a Crazyswarm/Crazyradio-like interface.
-
-        INSTRUCTIONS:
-            Re-implement this method to return the target position, velocity, acceleration,
-            attitude, and attitude rates to be sent from Crazyswarm to the Crazyflie using, e.g., a
-            `cmdFullState` call.
-
-        Args:
-            ep_time: Episode's elapsed time, in seconds.
-            obs: The quadrotor's Vicon data [x, 0, y, 0, z, 0, phi, theta, psi, 0, 0, 0].
-            reward: The reward signal.
-            done: Wether the episode has terminated.
-            info: Current step information as a dictionary with keys 'constraint_violation',
-                'current_target_gate_pos', etc.
-
-        Returns:
-            The command type and arguments to be sent to the quadrotor. See `Command`.
-        """
         iteration = int(ep_time * self.CTRL_FREQ)
-
-        #########################
-        # REPLACE THIS (START) ##
-        #########################
-
-        # Handcrafted solution for getting_stated scenario.
+        drone_position = obs[0:3]  # Assuming obs contains the drone's current position at indices 0, 1, 2
 
         if not self._take_off:
             command_type = Command.TAKEOFF
@@ -188,14 +174,20 @@ class Controller(BaseController):
             step = iteration - 2 * self.CTRL_FREQ  # Account for 2s delay due to takeoff
             if ep_time - 2 > 0 and step < len(self.ref_x):
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
-                target_vel = np.zeros(3)
+                error = target_pos - drone_position
+                self.integral_error += error * self.CTRL_TIMESTEP
+                derivative_error = (error - self.prev_error) / self.CTRL_TIMESTEP
+
+                # PID output
+                control_output = self.kp * error + self.ki * self.integral_error + self.kd * derivative_error
+                self.prev_error = error
+
+                target_vel = control_output  # Assuming direct control of velocity
                 target_acc = np.zeros(3)
                 target_yaw = 0.0
                 target_rpy_rates = np.zeros(3)
                 command_type = Command.FULLSTATE
                 args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]
-            # Notify set point stop has to be called every time we transition from low-level
-            # commands to high-level ones. Prepares for landing
             elif step >= len(self.ref_x) and not self._setpoint_land:
                 command_type = Command.NOTIFYSETPOINTSTOP
                 args = []
@@ -211,11 +203,8 @@ class Controller(BaseController):
                 command_type = Command.NONE
                 args = []
 
-        #########################
-        # REPLACE THIS (END) ####
-        #########################
-
         return command_type, args
+
 
     def step_learn(
         self,
