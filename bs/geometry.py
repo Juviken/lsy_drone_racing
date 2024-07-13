@@ -38,8 +38,8 @@ def create_cylinder(grid_size, center, radius, height, axis='z'):
     
     
     if axis == 'z':
-        dist_from_center = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-        cylinder = (dist_from_center <= radius) & (z >= center[2]) & (z < center[2] + height)
+        dist_from_center = np.sqrt((x - center[0])**2 + (y - center[1])**2)     # Calculate the distance from the center of the cylinder
+        cylinder = (dist_from_center <= radius) & (z >= center[2]) & (z < center[2] + height)  # Create a boolean array for the cylinder
     elif axis == 'x':
         dist_from_center = np.sqrt((y - center[1])**2 + (z - center[2])**2)
         cylinder = (dist_from_center <= radius) & (x >= center[0]) & (x < center[0] + height)

@@ -13,7 +13,7 @@ import csv
 class TrajGen:
     """Class for generating and optimizing 3D trajectories using cubic splines."""
 
-    def __init__(self, waypoints, obstacles, t2,initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50,alpha=0.7,scaling_factor=1,use_initial=False):
+    def __init__(self, waypoints, obstacles, t2,initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50,alpha=0.7,use_initial=False):
         self.waypoints = waypoints
         self.t2 = t2
         self.duration = duration
@@ -30,7 +30,7 @@ class TrajGen:
         self.obstacle_tree = self.create_obstacle_tree(obstacles)
         self.max_iterations = max_iterations
         self.alpha=alpha
-        self.scaling_factor = scaling_factor
+
         
 
     
@@ -50,7 +50,11 @@ class TrajGen:
         obstacle_points = []
         for obs in obstacles:
             points = np.argwhere(obs)   # Get indices of obstacle points
+            # Convert indices to coordinates
+            print("Viktigt", np.array(obs.shape))
             print(points)
+            points = ((points / 120) * 6) - 3
+            print("Points:",points)
             obstacle_points.extend(points)  # Add obstacle points to list
         return cKDTree(obstacle_points)     # Create KD-tree from list of obstacle points
 
@@ -66,6 +70,7 @@ class TrajGen:
         ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2], label='Cubic Spline Trajectory')
         #Plot obstacles
         for obs in self.obstacles:
+            print("Obstacle:",obs)
             ax.voxels(obs, facecolors='green', edgecolor='black')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
@@ -187,6 +192,9 @@ def main():
     obs2_pos = obstacle_positions[1][0:3]
     obs3_pos = obstacle_positions[2][0:3]
     obs4_pos = obstacle_positions[3][0:3]
+    #Print the obstacle positions
+    for i in range(len(obstacle_positions)):
+        print(f"Obstacle {i+1} position: {obstacle_positions[i]}")
     t2 = np.linspace(0, 1, waypoints.shape[0])
     
 
@@ -213,5 +221,6 @@ def main():
         
     else:
         traj_gen.plot_from_csv('bs_testing/combined_1500.csv')
+
 if __name__ == '__main__':
     main()
