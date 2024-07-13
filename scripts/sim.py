@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def simulate(
     config: str = "config/level0.yaml",
-    controller: str = "examples/controller copy.py",
+    controller: str = "examples/controller_copy.py",
     n_runs: int = 1,
     gui: bool = True,
     terminate_on_lap: bool = False,
@@ -73,6 +73,8 @@ def simulate(
     # Load the controller module
     path = Path(__file__).parents[1] / controller
     ctrl_class = load_controller(path)  # This returns a class, not an instance
+
+    #plotting the environment with matplotlib
 
     # Create a statistics collection
     stats = {

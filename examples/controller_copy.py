@@ -36,6 +36,8 @@ from lsy_drone_racing.utils import draw_trajectory
 #from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
 from lsy_drone_racing.normalized_class import TrajGen
 from lsy_drone_racing.geometry import create_cylinder
+from matplotlib import pyplot as plt
+from IPython import display
 
 
 
@@ -73,7 +75,7 @@ class Controller(BaseController):
         self.initial_obs = initial_obs
         self.VERBOSE = verbose
         self.BUFFER_SIZE = buffer_size
-        self.run_opt = False
+        
 
         # Store a priori scenario information.
         self.NOMINAL_GATES = initial_info["nominal_gates_pos_and_type"]
@@ -84,8 +86,12 @@ class Controller(BaseController):
         self.episode_reset()
 
         #########################
-        # REPLACE THIS (START) ##
+        # REPLACE THIS (START) ## 
         #########################
+        self.run_opt = False
+        self.plot_env = True
+        
+        
         waypoints = []
         waypoints.append([self.initial_obs[0], self.initial_obs[2], 0.3])
         gates = self.NOMINAL_GATES
@@ -105,11 +111,11 @@ class Controller(BaseController):
             ]
         )
         waypoints = np.array(waypoints)
-
+    
         #Obstacles
         obstacle_height = 0.6
         obstacle_radius = 0.15
-        grid = (120,100,120)
+        grid = (120,120,120)
         cyl1 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[0][0],self.NOMINAL_OBSTACLES[0][1], self.NOMINAL_OBSTACLES[0][2]), obstacle_radius, obstacle_height)
         cyl2 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[1][0],self.NOMINAL_OBSTACLES[1][1], self.NOMINAL_OBSTACLES[1][2]), obstacle_radius, obstacle_height)
         cyl3 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[2][0],self.NOMINAL_OBSTACLES[2][1], self.NOMINAL_OBSTACLES[2][2]), obstacle_radius, obstacle_height)
@@ -122,10 +128,17 @@ class Controller(BaseController):
         trajectory = interpolate.splev(t, tck)
         traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=1500,alpha=0.15,use_initial=False)
         print("Trajectory object created")
+        
+        #Plotting
+        
+        if self.plot_env:
+            #Plotting the environment
+            self.plot_func(obstacles)
+        
         self.run_opt = True
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
-            print(optimized_trajectory)
+            #print(optimized_trajectory)
             #Save final trajectory
             print("Hej")
             traj_gen.save_trajectory('optimized_trajectory.csv')
@@ -133,6 +146,7 @@ class Controller(BaseController):
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
         
         else:
+            print("Plotting from file...")
             filename = "optimized_trajectory.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
@@ -164,6 +178,29 @@ class Controller(BaseController):
         #########################
         # REPLACE THIS (END) ####
         #########################
+        
+    def plot_func(self,obstacles,gate_info=None):
+        """_summary_
+        Plotting the environment with obstacles and gateways using matplotlib
+        The dimensions of the environment is x=[-3,3] y = [-3,3] z = [0,6]
+        """
+        
+        #Plotting the environment
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        x = np.linspace(-3, 3, 120)
+        y = np.linspace(-3, 3, 120)
+        z = np.linspace(0, 6, 120)
+        x, y, z = np.meshgrid(x, y, z)
+        for i in range(4):
+            ax.voxels(obstacles[i], edgecolors='k')
+        plt.show()
+        
+        
+        
+        pass
+    
+    
 
     def compute_control(
         self,
