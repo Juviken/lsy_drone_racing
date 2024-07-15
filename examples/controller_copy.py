@@ -35,9 +35,11 @@ from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
 #from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
 from lsy_drone_racing.normalized_class import TrajGen
-from lsy_drone_racing.geometry import create_cylinder
+from lsy_drone_racing.cylinder_class import Cylinder
+from scipy.spatial import cKDTree
 from matplotlib import pyplot as plt
 from IPython import display
+
 
 
 
@@ -94,6 +96,8 @@ class Controller(BaseController):
         
         waypoints = []
         waypoints.append([self.initial_obs[0], self.initial_obs[2], 0.3])
+        #Print start positioj
+        print(f"Start position: {waypoints[0]}")
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
@@ -110,32 +114,35 @@ class Controller(BaseController):
                 initial_info["x_reference"][4],
             ]
         )
+        #Print end position
+        print(f"End position: {waypoints[-1]}")
         waypoints = np.array(waypoints)
     
-        #Obstacles
+        #Create obstacles
         obstacle_height = 0.6
         obstacle_radius = 0.15
-        grid = (120,120,120)
-        cyl1 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[0][0],self.NOMINAL_OBSTACLES[0][1], self.NOMINAL_OBSTACLES[0][2]), obstacle_radius, obstacle_height)
-        cyl2 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[1][0],self.NOMINAL_OBSTACLES[1][1], self.NOMINAL_OBSTACLES[1][2]), obstacle_radius, obstacle_height)
-        cyl3 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[2][0],self.NOMINAL_OBSTACLES[2][1], self.NOMINAL_OBSTACLES[2][2]), obstacle_radius, obstacle_height)
-        cyl4 = create_cylinder(grid,(self.NOMINAL_OBSTACLES[3][0],self.NOMINAL_OBSTACLES[3][1], self.NOMINAL_OBSTACLES[3][2]), obstacle_radius, obstacle_height)
-        obstacles = np.array([cyl1,cyl2,cyl3,cyl4])
+        obstacle_positions = [self.NOMINAL_OBSTACLES[i][0:3] for i in range(4)]
+        cyl1 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[0][0:3])
+        cyl2 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[1][0:3])
+        cyl3 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[2][0:3])
+        cyl4 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[3][0:3])
+        obstacles = [cyl1,cyl2,cyl3,cyl4]
+        
+        for i,j in enumerate(obstacles):
+            print(f"Obstacle {i+1} position: {j}")
+        
+        
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
         duration = 14
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=1500,alpha=0.15,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=100,alpha=0.15,use_initial=False)
         print("Trajectory object created")
         
-        #Plotting
+
         
-        if self.plot_env:
-            #Plotting the environment
-            self.plot_func(obstacles)
-        
-        self.run_opt = True
+        self.run_opt = False
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
             #print(optimized_trajectory)
@@ -178,27 +185,7 @@ class Controller(BaseController):
         #########################
         # REPLACE THIS (END) ####
         #########################
-        
-    def plot_func(self,obstacles,gate_info=None):
-        """_summary_
-        Plotting the environment with obstacles and gateways using matplotlib
-        The dimensions of the environment is x=[-3,3] y = [-3,3] z = [0,6]
-        """
-        
-        #Plotting the environment
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        x = np.linspace(-3, 3, 120)
-        y = np.linspace(-3, 3, 120)
-        z = np.linspace(0, 6, 120)
-        x, y, z = np.meshgrid(x, y, z)
-        for i in range(4):
-            ax.voxels(obstacles[i], edgecolors='k')
-        plt.show()
-        
-        
-        
-        pass
+
     
     
 

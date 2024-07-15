@@ -48,11 +48,13 @@ class TrajGen:
         """Convert obstacles to a KD-tree for fast distance calculations."""
         obstacle_points = []
         for obs in obstacles:
-            points = np.argwhere(obs)   # Get indices of obstacle points
+            points = obs.cylinder_points
+            # Convert indices to coordinates
             print(points)
+            print("Points:",points)
             obstacle_points.extend(points)  # Add obstacle points to list
         return cKDTree(obstacle_points)     # Create KD-tree from list of obstacle points
-
+    
     def plot_trajectory(self, trajectory):
         if trajectory is None:
             print("No trajectory data to plot.")

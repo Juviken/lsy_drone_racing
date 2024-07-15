@@ -6,8 +6,7 @@ from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
-from geometry import create_cylinder
-from gats_obs import give_gate, give_obst
+
 import csv
 
 class Cylinder:
@@ -27,7 +26,7 @@ class Cylinder:
         return str(self.cylinder_points)
 
 def plot_stuff  (obstacles,waypoints):
-    #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,6]
+    #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,2]
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.set_xlim(-3, 3)
@@ -42,8 +41,6 @@ def plot_stuff  (obstacles,waypoints):
     ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
     plt.show()
     
-
-
 
 def main():
     

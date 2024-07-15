@@ -33,6 +33,7 @@ from scipy import interpolate
 from lsy_drone_racing.command import Command
 from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
+import csv
 
 
 class Controller(BaseController):
@@ -64,6 +65,7 @@ class Controller(BaseController):
         # Save environment and control parameters.
         self.CTRL_TIMESTEP = initial_info["ctrl_timestep"]
         self.CTRL_FREQ = initial_info["ctrl_freq"]
+        self.information = initial_info
         self.initial_obs = initial_obs
         self.VERBOSE = verbose
         self.BUFFER_SIZE = buffer_size
@@ -77,8 +79,8 @@ class Controller(BaseController):
         self.episode_reset()
         
         # PID parameters
-        self.kp = np.array([0.4, 0.4, 0.6])  # Proportional gains for x, y, z
-        self.ki = np.array([0.05, 0.05, 0.1])  # Integral gains for x, y, z
+        self.kp = np.array([0.04, 0.04, 0.06])  # Proportional gains for x, y, z
+        self.ki = np.array([0.5, 0.5, 0.9])  # Integral gains for x, y, z
         self.kd = np.array([0.2, 0.2, 0.3])  # Derivative gains for x, y, z
 
         # Error accumulators
@@ -94,10 +96,16 @@ class Controller(BaseController):
         # all. It is meant solely as an example on how the drones can be controlled
         waypoints = []
         waypoints.append([self.initial_obs[0], self.initial_obs[2], 0.3])
+        print("Viktigt!!!!!",waypoints)
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
-        waypoints.append([1, 0, z_low])
+        print("VIKTIGT:",z_low,z_high)
+        #Save initial_info dict in a csv
+        
+        #waypoints.append([1, 0, z_low])
+        for i in range(200):
+            waypoints.append([1+(i/2000), 0, z_low])
         waypoints.append([gates[0][0] + 0.2, gates[0][1] + 0.1, z_low])
         waypoints.append([gates[0][0] + 0.1, gates[0][1], z_low])
         waypoints.append([gates[0][0] - 0.1, gates[0][1], z_low])
