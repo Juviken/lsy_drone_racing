@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
 from geometry import create_cylinder
 from gats_obs import give_gate, give_obst
-from cylinder_class import Cylinder
+from cylinder_class import Cylinder, waypoint_magic
 import csv
 
 class TrajGen:
@@ -182,8 +182,11 @@ def main():
     z_high = 1.0
 
     waypoints = np.array(give_gate())
+    #Use waypoint magic
+    waypoints = waypoint_magic(waypoints)
     #only keep the x,y and z positions from the waypoints
     waypoints = waypoints[:,0:3]
+    
     #Add a waypoints at the start of the trajectory
     start = np.array([[1,1,0.3],[1,0,z_low]])
     waypoints = np.concatenate((start,waypoints),axis=0)

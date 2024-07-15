@@ -186,7 +186,7 @@ def main():
     cylinder3 = create_cylinder((100, 100, 100), center=(80, 80, 0), radius=3, height=40, axis='z')
     obstacles = [cylinder1, cylinder2, cylinder3]
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=10, ctrl_freq=30, obstacle_margin=cylinder_radius*2, max_iterations=10,alpha=0.15,scaling_factor=1)
+    traj_gen = TrajGen(waypoints, obstacles, t2, duration=10, ctrl_freq=30, obstacle_margin=cylinder_radius*2, max_iterations=500,alpha=0.15,scaling_factor=1)
     
     run_optimization = True
     

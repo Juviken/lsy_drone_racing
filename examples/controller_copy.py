@@ -35,7 +35,7 @@ from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
 #from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
 from lsy_drone_racing.normalized_class import TrajGen
-from lsy_drone_racing.cylinder_class import Cylinder
+from lsy_drone_racing.planning_utils import Cylinder, waypoint_magic
 from scipy.spatial import cKDTree
 from matplotlib import pyplot as plt
 from IPython import display
@@ -58,7 +58,8 @@ class Controller(BaseController):
 
         INSTRUCTIONS:
             The controller's constructor has access the initial state `initial_obs` and the a priori
-            infromation contained in dictionary `initial_info`. Use this method to initialize
+            infromation contained in dictionary `initial_info`.
+            Use this method to initialize
             constants, counters, pre-plan trajectories, etc.
 
         Args:
@@ -93,20 +94,35 @@ class Controller(BaseController):
         self.run_opt = False
         self.plot_env = True
         
-        
-        waypoints = []
-        waypoints.append([self.initial_obs[0], self.initial_obs[2], 0.3])
-        #Print start positioj
-        print(f"Start position: {waypoints[0]}")
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
-        waypoints.append([1, 0, z_low])
+        
+        
+        waypoints = []
+        
+        first = [self.initial_obs[0], self.initial_obs[2], 0.3]
+        second = [1,0,z_low]
+        start = np.array([first,second])
+        
+        
+        #Print start positioj
+
+        gates = self.NOMINAL_GATES
+        z_low = initial_info["gate_dimensions"]["low"]["height"]
+        z_high = initial_info["gate_dimensions"]["tall"]["height"]
+        #waypoints.append([1, 0, z_low])
         waypoints.append([gates[0][0] , gates[0][1], z_low])
         waypoints.append([gates[1][0], gates[1][1], z_high])
         waypoints.append([gates[2][0], gates[2][1], z_low])
 
         waypoints.append([gates[3][0], gates[3][1] , z_high])
+        #Use waypoint magic
+        waypoints = waypoint_magic(np.array(waypoints))
+        print("Waypoints",waypoints)
+        #Add start to waypoints
+        waypoints = np.concatenate((start,waypoints),axis=0)
+        
         waypoints.append(
             [
                 initial_info["x_reference"][0],
@@ -119,7 +135,7 @@ class Controller(BaseController):
         waypoints = np.array(waypoints)
     
         #Create obstacles
-        obstacle_height = 0.6
+        obstacle_height = 0.9
         obstacle_radius = 0.15
         obstacle_positions = [self.NOMINAL_OBSTACLES[i][0:3] for i in range(4)]
         cyl1 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[0][0:3])
@@ -137,7 +153,7 @@ class Controller(BaseController):
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=100,alpha=0.15,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=500,alpha=0.15,use_initial=False)
         print("Trajectory object created")
         
 

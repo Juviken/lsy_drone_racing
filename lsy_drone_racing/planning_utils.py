@@ -6,6 +6,7 @@ from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
+from lsy_drone_racing.gats_obs import give_gate, give_obst
 
 import csv
 
@@ -41,6 +42,50 @@ def plot_stuff  (obstacles,waypoints):
     ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
     plt.show()
     
+import numpy as np
+
+def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.1) -> np.ndarray:
+    """
+    Take gate waypoint information like x, y, z, and rotation and return the waypoints with new waypoints
+    added just before and after each gate to ensure the drone does not hit the edge of the gate.
+    The yaw is in radians between -pi and pi
+
+    Args:
+        waypoints (np.ndarray): Array of waypoints where each row represents [x, y, z, yaw] for a gate.
+        buffer_distance (float): Distance before and after the gate to place additional waypoints.
+
+    Returns:
+        np.ndarray: Modified waypoints array including additional waypoints before and after each gate.
+    """
+    new_waypoints = []
+    for i in range(len(waypoints)):
+        # Extract the current waypoint, order is x, y, z,p,q yaw, height
+        x, y, z = waypoints[i, 0:3]
+        yaw = waypoints[i, -2]
+        print("Yaw:",yaw)
+
+        # Calculate direction vector for the buffer distance before and after the gate
+        dy = buffer_distance * np.cos(np.radians(yaw))
+        dx = buffer_distance * np.sin(np.radians(yaw))
+        #Print dx and dy
+        print("dx:",dx)
+        print("dy:",dy)
+        # Waypoint before the gate
+        waypoint_before = [x - dx, y - dy, z, yaw]
+        new_waypoints.append(waypoint_before)
+
+        # Original waypoint (at the gate)
+        new_waypoints.append([x, y, z, yaw])
+
+        # Waypoint after the gate
+        waypoint_after = [x + dx, y + dy, z, yaw]
+        new_waypoints.append(waypoint_after)
+
+    return np.array(new_waypoints)
+
+
+
+    
 
 def main():
     
@@ -62,6 +107,16 @@ def main():
 
     obstacles = [cylinder1, cylinder2, cylinder3, cylinder4]
     print("Object1",cylinder1)
+    # Example usage:
+    original_waypoints = np.array([
+        [0, 0, 1, 0],   # [x, y, z, yaw] format
+        [5, 5, 1, 45],
+        [10, 0, 1, 0]
+    ])
+
+    # Process waypoints to add buffer waypoints
+    processed_waypoints = waypoint_magic(original_waypoints)
+    print(processed_waypoints)
         
     plot_stuff(obstacles,waypoints)
     
