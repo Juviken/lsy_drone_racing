@@ -63,8 +63,13 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.1) -> np.nd
         print("Yaw:",yaw)
 
         # Calculate direction vector for the buffer distance before and after the gate
-        dy = buffer_distance * np.cos(np.radians(yaw))
-        dx = buffer_distance * np.sin(np.radians(yaw))
+        cos_angle = np.cos(yaw)
+        sin_angle = np.sin(yaw)
+        print("Cos angle:",cos_angle)
+        print("Sin angle:",sin_angle)
+        dy = buffer_distance * np.cos(yaw)
+        dx = buffer_distance * np.sin(yaw)
+        
         #Print dx and dy
         print("dx:",dx)
         print("dy:",dy)
@@ -78,7 +83,7 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.1) -> np.nd
         # Waypoint after the gate
         waypoint_after = [x + dx, y + dy, z, yaw]
         new_waypoints.append(waypoint_after)
-
+        print("New waypoints:",new_waypoints)
     return np.array(new_waypoints)
 
 

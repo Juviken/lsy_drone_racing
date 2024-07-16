@@ -123,15 +123,10 @@ class Controller(BaseController):
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
         
-        waypoints.append(
-            [
-                initial_info["x_reference"][0],
-                initial_info["x_reference"][2],
-                initial_info["x_reference"][4],
-            ]
-        )
+        last_point = [initial_info["x_reference"][0],initial_info["x_reference"][2],initial_info["x_reference"][4]]
+        waypoints = np.concatenate((waypoints,[last_point]),axis=0)
         #Print end position
-        print(f"End position: {waypoints[-1]}")
+
         waypoints = np.array(waypoints)
     
         #Create obstacles
@@ -144,16 +139,13 @@ class Controller(BaseController):
         cyl4 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[3][0:3])
         obstacles = [cyl1,cyl2,cyl3,cyl4]
         
-        for i,j in enumerate(obstacles):
-            print(f"Obstacle {i+1} position: {j}")
-        
         
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
         duration = 14
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=500,alpha=0.15,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=5,alpha=0.15,use_initial=False)
         print("Trajectory object created")
         
 

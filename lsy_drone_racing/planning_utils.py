@@ -44,7 +44,7 @@ def plot_stuff  (obstacles,waypoints):
     
 import numpy as np
 
-def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.1) -> np.ndarray:
+def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.2) -> np.ndarray:
     """
     Take gate waypoint information like x, y, z, and rotation and return the waypoints with new waypoints
     added just before and after each gate to ensure the drone does not hit the edge of the gate.
@@ -65,21 +65,26 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.1) -> np.nd
         print("Yaw:",yaw)
 
         # Calculate direction vector for the buffer distance before and after the gate
-        dy = buffer_distance * np.cos(np.radians(yaw))
-        dx = buffer_distance * np.sin(np.radians(yaw))
+        dx = buffer_distance * np.cos(yaw+np.pi/2)
+        dy = buffer_distance * np.sin(yaw+np.pi/2)
         #Print dx and dy
         print("dx:",dx)
         print("dy:",dy)
         # Waypoint before the gate
-        waypoint_before = [x - dx, y - dy, z, yaw]
-        new_waypoints.append(waypoint_before)
+        waypoint_after = [x - dx, y - dy, z]
+        waypoint_before= [x + dx, y + dy, z]
+        
 
         # Original waypoint (at the gate)
-        new_waypoints.append([x, y, z, yaw])
-
-        # Waypoint after the gate
-        waypoint_after = [x + dx, y + dy, z, yaw]
+        new_waypoints.append(waypoint_before)
+        
+        new_waypoints.append([x, y, z])
         new_waypoints.append(waypoint_after)
+        #new_waypoints.append([x, y, z])
+        
+        # Waypoint after the gate
+        
+        print("New waypoints:",new_waypoints)
 
     return np.array(new_waypoints)
 

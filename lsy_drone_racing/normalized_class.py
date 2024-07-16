@@ -50,8 +50,6 @@ class TrajGen:
         for obs in obstacles:
             points = obs.cylinder_points
             # Convert indices to coordinates
-            print(points)
-            print("Points:",points)
             obstacle_points.extend(points)  # Add obstacle points to list
         return cKDTree(obstacle_points)     # Create KD-tree from list of obstacle points
     

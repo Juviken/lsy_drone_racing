@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def simulate(
-    config: str = "config/level0.yaml",
+    config: str = "config/getting_started.yaml",
     controller: str = "examples/controller_copy.py",
     n_runs: int = 1,
     gui: bool = True,
