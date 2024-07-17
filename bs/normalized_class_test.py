@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
 from geometry import create_cylinder
 from gats_obs import give_gate, give_obst
-from cylinder_class import Cylinder, waypoint_magic
+from cylinder_class import Cylinder, gate_obstacle, waypoint_magic
 import csv
 
 class TrajGen:
@@ -50,10 +50,8 @@ class TrajGen:
         """Convert obstacles to a KD-tree for fast distance calculations."""
         obstacle_points = []
         for obs in obstacles:
-            points = obs.cylinder_points
+            points = obs.obstacle_points  # Convert indices to coordinates
             # Convert indices to coordinates
-            print(points)
-            print("Points:",points)
             obstacle_points.extend(points)  # Add obstacle points to list
         return cKDTree(obstacle_points)     # Create KD-tree from list of obstacle points
 
@@ -69,7 +67,7 @@ class TrajGen:
         ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2], label='Cubic Spline Trajectory')
         #Plot obstacles
         for obs in self.obstacles:
-            ax.plot(obs.cylinder_points[:, 0], obs.cylinder_points[:, 1], obs.cylinder_points[:, 2], color='r')
+            ax.plot(obs.obstacle_points[:, 0], obs.obstacle_points[:, 1], obs.obstacle_points[:, 2], color='r')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
@@ -89,7 +87,7 @@ class TrajGen:
         ax.scatter(self.waypoints[:, 0], self.waypoints[:, 1], self.waypoints[:, 2], color='r', label='Waypoints')
         #Plot obstacles
         for obs in self.obstacles:
-            ax.plot(obs.cylinder_points[:, 0], obs.cylinder_points[:, 1], obs.cylinder_points[:, 2], color='r')
+            ax.plot(obs.obstacle_points[:, 0], obs.obstacle_points[:, 1], obs.obstacle_points[:, 2], color='r')
             
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
@@ -176,12 +174,15 @@ class TrajGen:
 def main():
 
     
-    obstacle_height = 0.6
+    obstacle_height = 0.9
     obstacle_radius = 0.15
     z_low = 0.525
     z_high = 1.0
+    gate_radius = 0.3
 
-    waypoints = np.array(give_gate())
+    gatepoints = np.array(give_gate())
+    waypoints = gatepoints
+
     #Use waypoint magic
     waypoints = waypoint_magic(waypoints,buffer_distance=0.3)
     #only keep the x,y and z positions from the waypoints
@@ -192,23 +193,24 @@ def main():
     waypoints = np.concatenate((start,waypoints),axis=0)
     end = np.array([[0.0, -2.0, 0.5]])
     waypoints = np.concatenate((waypoints,end),axis=0)
-    print(waypoints)
     obstacle_positions = give_obst()
     obs1_pos = obstacle_positions[0][0:3]
     obs2_pos = obstacle_positions[1][0:3]
     obs3_pos = obstacle_positions[2][0:3]
     obs4_pos = obstacle_positions[3][0:3]
-    #Print the obstacle positions
-    for i in range(len(obstacle_positions)):
-        print(f"Obstacle {i+1} position: {obstacle_positions[i]}")
-    t2 = np.linspace(0, 1, waypoints.shape[0])
+    t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for waypoints
     
 
     cylinder1 = Cylinder(obstacle_radius, obstacle_height, obs1_pos)
     cylinder2 = Cylinder(obstacle_radius, obstacle_height, obs2_pos)
     cylinder3 = Cylinder(obstacle_radius, obstacle_height, obs3_pos)
     cylinder4 = Cylinder(obstacle_radius, obstacle_height, obs4_pos)
-    obstacles = [cylinder1, cylinder2, cylinder3,cylinder4]
+    gate1 = gate_obstacle(gatepoints[0],gate_radius)
+    obstacles = [cylinder1, cylinder2, cylinder3,cylinder4,gate1]
+    
+    #Create gate obstacles
+
+    
 
     traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=10,alpha=0.2,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)

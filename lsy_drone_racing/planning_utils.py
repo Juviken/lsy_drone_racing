@@ -66,6 +66,7 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
     Returns:
         np.ndarray: Modified waypoints array including additional waypoints before and after each gate.
     """
+    print("Input to magic:",waypoints)
     hard_coded = False
     new_waypoints = []
     for i in range(len(waypoints)):

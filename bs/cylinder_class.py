@@ -17,47 +17,41 @@ class Cylinder:
         self.x_center = center[0]
         self.y_center = center[1]
         self.z_center = center[2]
-        self.cylinder_points = self.cylinder_points()
+        self.obstacle_points = self.obstacle_points()
       
-    def cylinder_points(self):
+    def obstacle_points(self):
         #Numpy array of all points between the base and the top of the cylinder3
         return np.array([[self.x_center, self.y_center, z + (self.height/2)] for z in np.linspace(self.z_center - self.height/2, self.z_center + self.height/2, 10)])
     
     def __str__(self) -> str:
-        return str(self.cylinder_points)
+        return str(self.obstacle_points)
     
 class gate_obstacle:
     """_summary_
     Create a gate object which contains 4 points, one above, one on the bottom and 2 to the sides considering the yaw of the gate
     """
-    def __init__(self, x, y, z, yaw,radius):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.yaw = yaw
+    def __init__(self, waypoint,radius):
+        self.x = waypoint[0]
+        self.y = waypoint[1]
+        self.z = waypoint[2]
+        self.yaw = waypoint[5]
         self.radius = radius
-        self.gate_points = self.gate_points()
+        self.obstacle_points = self.gate_points()
         
-    def gate_points():
+    def gate_points(self):
         
         top = np.array([self.x, self.y, self.z + self.radius])
         bottom = np.array([self.x, self.y, self.z - self.radius])
+        dx = self.radius * np.cos(self.yaw)
+        dy = self.radius * np.sin(self.yaw)
+        left = np.array([self.x - dx, self.y - dy, self.z])
+        right = np.array([self.x + dx, self.y + dy, self.z])
+        return np.array([top,bottom,left,right])
+        
+    def __str__(self) -> str:
+        return str(self.gate_points)
 
-def plot_stuff  (obstacles,waypoints):
-    #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,6]
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlim(-3, 3)
-    ax.set_ylim(-3, 3)
-    ax.set_zlim(0, 2)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title('Obstacles and Waypoints')
-    for obstacle in obstacles:
-        ax.plot(obstacle.cylinder_points[:,0], obstacle.cylinder_points[:,1], obstacle.cylinder_points[:,2], color='r')
-    ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
-    plt.show()
+
     
 def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.ndarray:
     """
@@ -72,12 +66,13 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
     Returns:
         np.ndarray: Modified waypoints array including additional waypoints before and after each gate.
     """
+    print("Input to magic:",waypoints)
     hard_coded = False
     new_waypoints = []
     for i in range(len(waypoints)):
         # Extract the current waypoint, order is x, y, z,yaw
         x, y, z = waypoints[i, 0:3]
-        yaw = waypoints[i, 3]
+        yaw = waypoints[i, 5]
         
 
         # Calculate direction vector for the buffer distance before and after the gate
@@ -107,6 +102,22 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
         print("New waypoints:",new_waypoints)
 
     return np.array(new_waypoints)
+
+def plot_stuff  (obstacles,waypoints):
+    #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,6]
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlim(-3, 3)
+    ax.set_ylim(-3, 3)
+    ax.set_zlim(0, 2)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Obstacles and Waypoints')
+    for obstacle in obstacles:
+        ax.plot(obstacle.obstacle_points[:,0], obstacle.obstacle_points[:,1], obstacle.obstacle_points[:,2], color='r')
+    ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
+    plt.show()
 
 
 def main():
