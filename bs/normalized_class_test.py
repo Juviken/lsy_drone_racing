@@ -183,7 +183,7 @@ def main():
 
     waypoints = np.array(give_gate())
     #Use waypoint magic
-    waypoints = waypoint_magic(waypoints)
+    waypoints = waypoint_magic(waypoints,buffer_distance=0.3)
     #only keep the x,y and z positions from the waypoints
     waypoints = waypoints[:,0:3]
     

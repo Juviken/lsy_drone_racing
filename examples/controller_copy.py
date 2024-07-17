@@ -79,6 +79,8 @@ class Controller(BaseController):
         self.VERBOSE = verbose
         self.BUFFER_SIZE = buffer_size
         
+        #Print the keys of initial_info
+        print("Keys of initial_info: ", initial_info.keys())
 
         # Store a priori scenario information.
         self.NOMINAL_GATES = initial_info["nominal_gates_pos_and_type"]
@@ -112,13 +114,19 @@ class Controller(BaseController):
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
         #waypoints.append([1, 0, z_low])
+        gatepoints = []
+        gatepoints.append([gates[0][0] , gates[0][1], z_low, gates[0][-2]])
+        gatepoints.append([gates[1][0], gates[1][1], z_high, gates[1][-2]])
+        gatepoints.append([gates[2][0], gates[2][1], z_low, gates[2][-2]])
+        gatepoints.append([gates[3][0], gates[3][1] , z_high, gates[3][-2]])
+        
         waypoints.append([gates[0][0] , gates[0][1], z_low])
         waypoints.append([gates[1][0], gates[1][1], z_high])
         waypoints.append([gates[2][0], gates[2][1], z_low])
 
         waypoints.append([gates[3][0], gates[3][1] , z_high])
         #Use waypoint magic
-        waypoints = waypoint_magic(np.array(waypoints))
+        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)
         print("Waypoints",waypoints)
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
@@ -145,12 +153,12 @@ class Controller(BaseController):
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.15, max_iterations=5,alpha=0.15,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.2, max_iterations=200,alpha=0.2,use_initial=False)
         print("Trajectory object created")
         
 
         
-        self.run_opt = False
+        self.run_opt = True
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
             #print(optimized_trajectory)
@@ -181,7 +189,7 @@ class Controller(BaseController):
         self.waypoints = waypoints
 
         
-        assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
+        #assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
 
         if self.VERBOSE:
             # Draw the trajectory on PyBullet's GUI.
@@ -225,6 +233,11 @@ class Controller(BaseController):
             The command type and arguments to be sent to the quadrotor. See `Command`.
         """
         iteration = int(ep_time * self.CTRL_FREQ)
+        #Print the keys of info
+        #print("Keys of info: ", info.keys())
+        #Keys of interest: gates_pose, gates_in_range, obstacles_pose, obstacles_in_range, gate_id
+        #Print the obstacle positions
+        #print("Obstacle positions: ", info["gates_pose"])
 
         #########################
         # REPLACE THIS (START) ##

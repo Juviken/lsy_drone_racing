@@ -10,26 +10,38 @@ from lsy_drone_racing.geometry import create_cylinder
 import csv
 
 class TrajGen:
-    """Class for generating and optimizing 3D trajectories using cubic splines."""
+    def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50, alpha=0.7, scaling_factor=1, use_initial=False):
+        """_summary_
 
-    def __init__(self, waypoints, obstacles, t2,initial_guess, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50,alpha=0.7,scaling_factor=1,use_initial=False):
+        Args:
+            waypoints (_type_): _description_
+            obstacles (_type_): _description_
+            t2 (_type_): _description_
+            initial_guess (_type_, optional): _description_. Defaults to None.
+            duration (int, optional): _description_. Defaults to 10.
+            ctrl_freq (int, optional): _description_. Defaults to 30.
+            obstacle_margin (int, optional): _description_. Defaults to 2.
+            max_iterations (int, optional): _description_. Defaults to 50.
+            alpha (float, optional): _description_. Defaults to 0.7.
+            scaling_factor (int, optional): _description_. Defaults to 1.
+            use_initial (bool, optional): _description_. Defaults to False.
+        """
         self.waypoints = waypoints
         self.t2 = t2
         self.duration = duration
         self.ctrl_freq = ctrl_freq
         self.obstacle_margin = obstacle_margin
-        if use_initial:
-            self.initial_guess = initial_guess
-        else:
-            self.initial_guess = self.generate_initial_guess()
+        self.max_iterations = max_iterations
+        self.alpha = alpha
+        self.scaling_factor = scaling_factor
+
+        self.initial_guess = initial_guess if use_initial and initial_guess is not None else self.generate_initial_guess()
         self.current_trajectory = None
         self.intermediate_trajectories = {'Initial Guess': self.initial_guess}
         self.optimization_iterations = 0
         self.obstacles = obstacles
         self.obstacle_tree = self.create_obstacle_tree(obstacles)
-        self.max_iterations = max_iterations
-        self.alpha=alpha
-        self.scaling_factor = scaling_factor
+
         
 
     
