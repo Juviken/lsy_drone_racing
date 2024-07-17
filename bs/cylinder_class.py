@@ -28,7 +28,7 @@ class Cylinder:
     
 class gate_obstacle:
     """_summary_
-    Create a gate object which contains 4 points, one above, one on the bottom and 2 to the sides considering the yaw of the gate
+    Create a gate object which contains 8 points, one above, one on the bottom and 2 to the sides considering the yaw of the gate
     """
     def __init__(self, waypoint,radius):
         self.x = waypoint[0]
@@ -46,7 +46,11 @@ class gate_obstacle:
         dy = self.radius * np.sin(self.yaw)
         left = np.array([self.x - dx, self.y - dy, self.z])
         right = np.array([self.x + dx, self.y + dy, self.z])
-        return np.array([top,bottom,left,right])
+        top_left = np.array([self.x - dx, self.y - dy, self.z + self.radius])
+        top_right = np.array([self.x + dx, self.y + dy, self.z + self.radius])
+        bottom_left = np.array([self.x - dx, self.y - dy, self.z - self.radius])
+        bottom_right = np.array([self.x + dx, self.y + dy, self.z - self.radius])
+        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right])
         
     def __str__(self) -> str:
         return str(self.gate_points)
@@ -76,25 +80,25 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
         
 
         # Calculate direction vector for the buffer distance before and after the gate
-        dx = buffer_distance * np.cos(yaw+np.pi/2)
-        dy = buffer_distance * np.sin(yaw+np.pi/2)
-        print("Viktigt!!!!",np.cos(3.14))
+        dx = buffer_distance * np.cos(yaw+(np.pi/2))
+        dy = buffer_distance * np.sin(yaw+(np.pi/2))
         #Print dx and dy
         print(f"Yaw{i}",yaw)
         print(f"dx{i}",dx)
         print("dy:",dy)
         # Waypoint before the gate
-        waypoint_after = [x - dx, y - dy, z]
+        
         waypoint_before= [x + dx, y + dy, z]
-    
+        waypoint_after = [x - dx, y - dy, z]
         
 
         # Original waypoint (at the gate)
-        new_waypoints.append(waypoint_before)
-    
         
-        new_waypoints.append([x, y, z])
+    
         new_waypoints.append(waypoint_after)
+        new_waypoints.append([x, y, z])
+        new_waypoints.append(waypoint_before)
+        
         #new_waypoints.append([x, y, z])
         
         # Waypoint after the gate
@@ -117,6 +121,9 @@ def plot_stuff  (obstacles,waypoints):
     for obstacle in obstacles:
         ax.plot(obstacle.obstacle_points[:,0], obstacle.obstacle_points[:,1], obstacle.obstacle_points[:,2], color='r')
     ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
+    #Add limits to plot
+    ax.set_xlim(-3, 3)
+    ax.set_ylim(-3, 3)
     plt.show()
 
 

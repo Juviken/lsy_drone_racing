@@ -67,12 +67,15 @@ class TrajGen:
         ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2], label='Cubic Spline Trajectory')
         #Plot obstacles
         for obs in self.obstacles:
-            ax.plot(obs.obstacle_points[:, 0], obs.obstacle_points[:, 1], obs.obstacle_points[:, 2], color='r')
+            ax.scatter(obs.obstacle_points[:, 0], obs.obstacle_points[:, 1], obs.obstacle_points[:, 2], color='r')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         ax.set_title('3D Cubic Spline Interpolation and Trajectory Optimization')
         ax.legend()
+        #Set limits
+        ax.set_xlim(-2, 2)
+        ax.set_ylim(-2, 2)
         plt.show()
 
 
@@ -206,13 +209,16 @@ def main():
     cylinder3 = Cylinder(obstacle_radius, obstacle_height, obs3_pos)
     cylinder4 = Cylinder(obstacle_radius, obstacle_height, obs4_pos)
     gate1 = gate_obstacle(gatepoints[0],gate_radius)
-    obstacles = [cylinder1, cylinder2, cylinder3,cylinder4,gate1]
+    gate2 = gate_obstacle(gatepoints[1],gate_radius)
+    gate3 = gate_obstacle(gatepoints[2],gate_radius)
+    gate4 = gate_obstacle(gatepoints[3],gate_radius)
+    obstacles = [cylinder1, cylinder2, cylinder3,cylinder4,gate1,gate2,gate3,gate4]
     
     #Create gate obstacles
 
     
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=10,alpha=0.2,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=50,alpha=0.2,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
     run_optimization = False
     
