@@ -210,7 +210,7 @@ def main():
     cylinder4 = Cylinder(obstacle_radius, obstacle_height, obs4_pos)
     obstacles = [cylinder1, cylinder2, cylinder3,cylinder4]
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=500,alpha=0.2,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=10,alpha=0.2,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
     run_optimization = False
     

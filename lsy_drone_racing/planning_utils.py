@@ -25,6 +25,15 @@ class Cylinder:
     
     def __str__(self) -> str:
         return str(self.cylinder_points)
+    
+class Gate:
+    def __init__(self, x, y, z, yaw,height):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.yaw = yaw
+        self.height = height
+        
 
 def plot_stuff  (obstacles,waypoints):
     #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,2]
@@ -68,7 +77,6 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
         # Calculate direction vector for the buffer distance before and after the gate
         dx = buffer_distance * np.cos(yaw+np.pi/2)
         dy = buffer_distance * np.sin(yaw+np.pi/2)
-        print("Viktigt!!!!",np.cos(3.14))
         #Print dx and dy
         print(f"Yaw{i}",yaw)
         print(f"dx{i}",dx)

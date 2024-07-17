@@ -126,7 +126,7 @@ class Controller(BaseController):
 
         waypoints.append([gates[3][0], gates[3][1] , z_high])
         #Use waypoint magic
-        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)
+        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.3)
         print("Waypoints",waypoints)
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
@@ -153,12 +153,12 @@ class Controller(BaseController):
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.2, max_iterations=200,alpha=0.2,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.2, max_iterations=100,alpha=0.5,use_initial=False)
         print("Trajectory object created")
         
 
         
-        self.run_opt = True
+        self.run_opt = False
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
             #print(optimized_trajectory)
@@ -189,7 +189,7 @@ class Controller(BaseController):
         self.waypoints = waypoints
 
         
-        #assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
+        assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
 
         if self.VERBOSE:
             # Draw the trajectory on PyBullet's GUI.
