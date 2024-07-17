@@ -10,12 +10,12 @@ from lsy_drone_racing.geometry import create_cylinder
 import csv
 
 class TrajGen:
-    def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50, alpha=0.7, scaling_factor=1, use_initial=False):
+    def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,obstacle_margin_gate=0.2, max_iterations=50, alpha=0.7, scaling_factor=1, use_initial=False):
         """_summary_
 
         Args:
             waypoints (_type_): _description_
-            obstacles (_type_): _description_
+            obstacles (_type_): _description_ : list of obstacles in the form of numpy arrays
             t2 (_type_): _description_
             initial_guess (_type_, optional): _description_. Defaults to None.
             duration (int, optional): _description_. Defaults to 10.
@@ -31,6 +31,7 @@ class TrajGen:
         self.duration = duration
         self.ctrl_freq = ctrl_freq
         self.obstacle_margin = obstacle_margin
+        self.obstacle_margin_gate = obstacle_margin_gate
         self.max_iterations = max_iterations
         self.alpha = alpha
         self.scaling_factor = scaling_factor
@@ -40,7 +41,8 @@ class TrajGen:
         self.intermediate_trajectories = {'Initial Guess': self.initial_guess}
         self.optimization_iterations = 0
         self.obstacles = obstacles
-        self.obstacle_tree = self.create_obstacle_tree(obstacles)
+        self.obstacle_tree = self.create_obstacle_tree(obstacles[0:4])
+        self.obstacle_tree2 = self.create_obstacle_tree(obstacles[4:8])
 
         
 
@@ -59,8 +61,11 @@ class TrajGen:
     def create_obstacle_tree(self, obstacles):
         """Convert obstacles to a KD-tree for fast distance calculations."""
         obstacle_points = []
+        print("Creating obstacle tree...")
+        print("Length of obstacles: ", len(obstacles))
         for obs in obstacles:
-            points = obs.cylinder_points
+            
+            points = obs.obstacle_points
             # Convert indices to coordinates
             obstacle_points.extend(points)  # Add obstacle points to list
         return cKDTree(obstacle_points)     # Create KD-tree from list of obstacle points
@@ -116,7 +121,7 @@ class TrajGen:
             self.intermediate_trajectories[f"Iteration{self.optimization_iterations}"] = traj.reshape(-1, 3)
             self.current_trajectory = traj.reshape(-1, 3)
 
-        constraints = [self.inequality_constraint(), self.equality_constraint()]
+        constraints = [self.inequality_constraint(),self.inequality_constraint2(), self.equality_constraint()]
         initial_guess_flat = self.initial_guess.flatten()
         result = minimize(
             lambda traj: self.smoothness_objective(traj),
@@ -157,6 +162,15 @@ class TrajGen:
             traj = traj.reshape(-1, 3)
             distances, _ = self.obstacle_tree.query(traj)
             return np.min(distances - self.obstacle_margin)
+        return {'type': 'ineq', 'fun': constraint}
+    
+    def inequality_constraint2(self):
+        
+        def constraint(traj):
+            traj = traj.reshape(-1, 3)
+            distances, _ = self.obstacle_tree2.query(traj)
+            return np.min(distances - self.obstacle_margin_gate)
+        
         return {'type': 'ineq', 'fun': constraint}
 
     def equality_constraint(self):

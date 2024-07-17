@@ -35,7 +35,7 @@ from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
 #from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
 from lsy_drone_racing.normalized_class import TrajGen
-from lsy_drone_racing.planning_utils import Cylinder, waypoint_magic
+from lsy_drone_racing.planning_utils import Cylinder,gate_obstacle, waypoint_magic
 from scipy.spatial import cKDTree
 from matplotlib import pyplot as plt
 from IPython import display
@@ -108,17 +108,23 @@ class Controller(BaseController):
         start = np.array([first,second])
         
         
-        #Print start positioj
+        #Print start position
 
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
+        #Print gates
+        print("Gates")
+        print(gates [0][-1])
+        print(gates [1][-1])
+        print(gates [2][-1])
+        print(gates [3][-1])
         #waypoints.append([1, 0, z_low])
         gatepoints = []
-        gatepoints.append([gates[0][0] , gates[0][1], z_low, gates[0][-2]])
-        gatepoints.append([gates[1][0], gates[1][1], z_high, gates[1][-2]])
-        gatepoints.append([gates[2][0], gates[2][1], z_low, gates[2][-2]])
-        gatepoints.append([gates[3][0], gates[3][1] , z_high, gates[3][-2]])
+        gatepoints.append([gates[0][0] , gates[0][1], z_high if gates[0][-1] == 0 else z_low, gates[0][-2]])
+        gatepoints.append([gates[1][0], gates[1][1], z_high if gates[1][-1] == 0 else z_low, gates[1][-2]])
+        gatepoints.append([gates[2][0], gates[2][1], z_high if gates[2][-1] == 0 else z_low, gates[2][-2]])
+        gatepoints.append([gates[3][0], gates[3][1] , z_high if gates[3][-1] == 0 else z_low, gates[3][-2]])
         
         waypoints.append([gates[0][0] , gates[0][1], z_low])
         waypoints.append([gates[1][0], gates[1][1], z_high])
@@ -126,7 +132,7 @@ class Controller(BaseController):
 
         waypoints.append([gates[3][0], gates[3][1] , z_high])
         #Use waypoint magic
-        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.3)
+        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)
         print("Waypoints",waypoints)
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
@@ -140,12 +146,18 @@ class Controller(BaseController):
         #Create obstacles
         obstacle_height = 0.9
         obstacle_radius = 0.15
+        obstacle_margin = 0.3
         obstacle_positions = [self.NOMINAL_OBSTACLES[i][0:3] for i in range(4)]
         cyl1 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[0][0:3])
         cyl2 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[1][0:3])
         cyl3 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[2][0:3])
         cyl4 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[3][0:3])
-        obstacles = [cyl1,cyl2,cyl3,cyl4]
+        #Gate obstacles
+        gate_obstacle1 = gate_obstacle(gates[0],z_high if gates [0][-1] == 1 else z_low)
+        gate_obstacle2 = gate_obstacle(gates[1],z_high)
+        gate_obstacle3 = gate_obstacle(gates[2],z_low)
+        gate_obstacle4 = gate_obstacle(gates[3],z_high)
+        obstacles = [cyl1,cyl2,cyl3,cyl4,gate_obstacle1,gate_obstacle2,gate_obstacle3,gate_obstacle4]
         
         
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
@@ -153,7 +165,7 @@ class Controller(BaseController):
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.2, max_iterations=100,alpha=0.5,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.35,obstacle_margin_gate=0.2, max_iterations=500,alpha=0.3,use_initial=False)
         print("Trajectory object created")
         
 
