@@ -41,9 +41,6 @@ from matplotlib import pyplot as plt
 from IPython import display
 
 
-
-
-
 class Controller(BaseController):
     """Template controller class."""
 
@@ -94,7 +91,8 @@ class Controller(BaseController):
         # REPLACE THIS (START) ## 
         #########################
         self.run_opt = False
-        self.plot_env = True
+        print("Gate Dimensions: ", initial_info["gate_dimensions"])
+      
         
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
@@ -186,15 +184,7 @@ class Controller(BaseController):
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
-   
-        print("Here is info: ", initial_info.keys, self.NOMINAL_GATES)
-        print("DIMS: ", initial_info["gate_dimensions"])
-        #DOVUL!!!!
-
-
-        # Example: Hard-code waypoints through the gates. Obviously this is a crude way of
-        # completing the challenge that is highly susceptible to noise and does not generalize at
-        # all. It is meant solely as an example on how the drones can be controlled
+           
         
 
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
@@ -255,9 +245,7 @@ class Controller(BaseController):
         # REPLACE THIS (START) ##
         #########################
 
-        #DOVUL OBS 
-       
-        # DOVUL OBS END
+
 
 
 

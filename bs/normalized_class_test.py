@@ -64,18 +64,19 @@ class TrajGen:
         fig = plt.figure(figsize=(10, 7))
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(self.waypoints[:, 0], self.waypoints[:, 1], self.waypoints[:, 2], color='r', label='Waypoints')
-        ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2], label='Cubic Spline Trajectory')
+        ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2], label='Trajectory', color='g')
         #Plot obstacles
-        for obs in self.obstacles:
-            ax.scatter(obs.obstacle_points[:, 0], obs.obstacle_points[:, 1], obs.obstacle_points[:, 2], color='r')
+
+        for j,obs in enumerate(self.obstacles):
+            ax.scatter(obs.obstacle_points[:, 0], obs.obstacle_points[:, 1], obs.obstacle_points[:, 2], color='r' if j<4 else 'b', label='Obstacles')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         ax.set_title('3D Cubic Spline Interpolation and Trajectory Optimization')
         ax.legend()
         #Set limits
-        ax.set_xlim(-2, 2)
-        ax.set_ylim(-2, 2)
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
         plt.show()
 
 
@@ -234,7 +235,7 @@ def main():
         traj_gen.save_trajectory('optimized_trajectory_test.csv')
         
     else:
-        traj_gen.plot_from_csv('optimized_trajectory.csv')
+        traj_gen.plot_from_csv('col_gate3.csv')
 
 if __name__ == '__main__':
     main()

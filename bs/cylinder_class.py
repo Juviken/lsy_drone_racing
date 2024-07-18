@@ -44,13 +44,22 @@ class gate_obstacle:
         bottom = np.array([self.x, self.y, self.z - self.radius])
         dx = self.radius * np.cos(self.yaw)
         dy = self.radius * np.sin(self.yaw)
-        left = np.array([self.x - dx, self.y - dy, self.z])
-        right = np.array([self.x + dx, self.y + dy, self.z])
+        
+        #Corners of the gate
         top_left = np.array([self.x - dx, self.y - dy, self.z + self.radius])
         top_right = np.array([self.x + dx, self.y + dy, self.z + self.radius])
         bottom_left = np.array([self.x - dx, self.y - dy, self.z - self.radius])
         bottom_right = np.array([self.x + dx, self.y + dy, self.z - self.radius])
-        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right])
+        
+        #Generate 5 points in-between each of the corners
+        #Top row
+        top_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z + self.radius])
+        bottom_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z - self.radius])
+        
+        
+        left = np.array([self.x - dx, self.y - dy, self.z])
+        right = np.array([self.x + dx, self.y + dy, self.z])
+        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right,top_left_inter,bottom_left_inter])
         
     def __str__(self) -> str:
         return str(self.gate_points)
@@ -71,7 +80,6 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
         np.ndarray: Modified waypoints array including additional waypoints before and after each gate.
     """
     print("Input to magic:",waypoints)
-    hard_coded = False
     new_waypoints = []
     for i in range(len(waypoints)):
         # Extract the current waypoint, order is x, y, z,yaw
