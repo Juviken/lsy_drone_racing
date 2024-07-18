@@ -79,7 +79,7 @@ class Controller(BaseController):
         self.episode_reset()
         
         # PID parameters
-        self.kp = np.array([0.04, 0.04, 0.06])  # Proportional gains for x, y, z
+        self.kp = np.array([0.001, 0.001, 0.001])  # Proportional gains for x, y, z
         self.ki = np.array([0.5, 0.5, 0.9])  # Integral gains for x, y, z
         self.kd = np.array([0.2, 0.2, 0.3])  # Derivative gains for x, y, z
 
