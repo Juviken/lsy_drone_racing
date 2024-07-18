@@ -80,8 +80,8 @@ class Controller(BaseController):
         
         # PID parameters
         self.kp = np.array([0.001, 0.001, 0.001])  # Proportional gains for x, y, z
-        self.ki = np.array([0.5, 0.5, 0.9])  # Integral gains for x, y, z
-        self.kd = np.array([0.2, 0.2, 0.3])  # Derivative gains for x, y, z
+        self.ki = np.array([0.001, 0.001, 0.001])  # Integral gains for x, y, z
+        self.kd = np.array([0.001, 0.001, 0.001])  # Derivative gains for x, y, z
 
         # Error accumulators
         self.integral_error = np.zeros(3)
@@ -96,16 +96,15 @@ class Controller(BaseController):
         # all. It is meant solely as an example on how the drones can be controlled
         waypoints = []
         waypoints.append([self.initial_obs[0], self.initial_obs[2], 0.3])
-        print("Viktigt!!!!!",waypoints)
+      
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
-        print("VIKTIGT:",z_low,z_high)
+
         #Save initial_info dict in a csv
         
-        #waypoints.append([1, 0, z_low])
-        for i in range(200):
-            waypoints.append([1+(i/2000), 0, z_low])
+        waypoints.append([1, 0, z_low])
+
         waypoints.append([gates[0][0] + 0.2, gates[0][1] + 0.1, z_low])
         waypoints.append([gates[0][0] + 0.1, gates[0][1], z_low])
         waypoints.append([gates[0][0] - 0.1, gates[0][1], z_low])
@@ -144,10 +143,7 @@ class Controller(BaseController):
         duration = 12
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ))
         trajectory = interpolate.splev(t, tck)
-        print("Trajectory type:",type(trajectory))
-        print(type(trajectory[0]))
-        print(trajectory[0].shape)
-        print("Trajectory", trajectory)
+ 
         
         self.ref_x, self.ref_y, self.ref_z = interpolate.splev(t, tck)
         assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"

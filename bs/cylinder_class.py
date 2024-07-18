@@ -55,11 +55,18 @@ class gate_obstacle:
         #Top row
         top_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z + self.radius])
         bottom_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z - self.radius])
+        top_right_inter = np.array([self.x + dx/2, self.y + dy/2, self.z + self.radius])
+        bottom_right_inter = np.array([self.x + dx/2, self.y + dy/2, self.z - self.radius])
+        left_top_inter = np.array([self.x - dx, self.y - dy, self.z + self.radius/2])
+        left_bottom_inter = np.array([self.x - dx, self.y - dy, self.z - self.radius/2])
+        right_top_inter = np.array([self.x + dx, self.y + dy, self.z + self.radius/2])
+        right_bottom_inter = np.array([self.x + dx, self.y + dy, self.z - self.radius/2])
+        
         
         
         left = np.array([self.x - dx, self.y - dy, self.z])
         right = np.array([self.x + dx, self.y + dy, self.z])
-        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right,top_left_inter,bottom_left_inter])
+        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right,top_left_inter,bottom_left_inter,top_right_inter,bottom_right_inter,left_top_inter,left_bottom_inter, right_top_inter,right_bottom_inter])
         
     def __str__(self) -> str:
         return str(self.gate_points)

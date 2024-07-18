@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def simulate(
-    config: str = "config/level1.yaml",
-    controller: str = "examples/controller_copy.py",
+    config: str = "config/level0.yaml",
+    controller: str = "examples/traj_controll.py",
     n_runs: int = 1,
     gui: bool = True,
     terminate_on_lap: bool = False,

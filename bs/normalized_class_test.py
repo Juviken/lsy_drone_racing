@@ -77,6 +77,7 @@ class TrajGen:
         #Set limits
         ax.set_xlim(-1.5, 1.5)
         ax.set_ylim(-1.5, 1.5)
+        ax.set_zlim(0, 2.5)
         plt.show()
 
 
@@ -188,7 +189,7 @@ def main():
     waypoints = gatepoints
 
     #Use waypoint magic
-    waypoints = waypoint_magic(waypoints,buffer_distance=0.3)
+    waypoints = waypoint_magic(waypoints,buffer_distance=0.35)
     #only keep the x,y and z positions from the waypoints
     waypoints = waypoints[:,0:3]
     
@@ -219,7 +220,7 @@ def main():
 
     
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=50,alpha=0.2,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=50,alpha=0.1,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
     run_optimization = False
     
@@ -235,7 +236,7 @@ def main():
         traj_gen.save_trajectory('optimized_trajectory_test.csv')
         
     else:
-        traj_gen.plot_from_csv('col_gate3.csv')
+        traj_gen.plot_from_csv('optimized_trajectory_test.csv')
 
 if __name__ == '__main__':
     main()

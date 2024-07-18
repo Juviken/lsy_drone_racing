@@ -90,13 +90,23 @@ class Controller(BaseController):
         #########################
         # REPLACE THIS (START) ## 
         #########################
+        
+        # PID parameters
+        self.kp = np.array([0.001, 0.001, 0.001])  # Proportional gains for x, y, z
+        self.ki = np.array([0.001, 0.001, 0.001])  # Integral gains for x, y, z
+        self.kd = np.array([0.1, 0.1, 0.1])  # Derivative gains for x, y, z
+
+        # Error accumulators
+        self.integral_error = np.zeros(3)
+        self.prev_error = np.zeros(3)
+        
         self.run_opt = False
         print("Gate Dimensions: ", initial_info["gate_dimensions"])
       
         
         gates = self.NOMINAL_GATES
-        z_low = initial_info["gate_dimensions"]["low"]["height"]
-        z_high = initial_info["gate_dimensions"]["tall"]["height"]
+        z_low = initial_info["gate_dimensions"]["low"]["height"]-0.1
+        z_high = initial_info["gate_dimensions"]["tall"]["height"]-0.1
         
         
         waypoints = []
@@ -130,7 +140,7 @@ class Controller(BaseController):
 
         waypoints.append([gates[3][0], gates[3][1] , z_high])
         #Use waypoint magic
-        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)
+        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.4)
         print("Waypoints",waypoints)
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
@@ -163,7 +173,7 @@ class Controller(BaseController):
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.35,obstacle_margin_gate=0.2, max_iterations=500,alpha=0.3,use_initial=False)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.35,obstacle_margin_gate=0.25, max_iterations=50,alpha=0.3,use_initial=False)
         print("Trajectory object created")
         
 
@@ -180,7 +190,7 @@ class Controller(BaseController):
         
         else:
             print("Plotting from file...")
-            filename = "optimized_trajectory.csv"
+            filename = "optimized_trajectory_test.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
@@ -215,41 +225,8 @@ class Controller(BaseController):
         done: bool | None = None,
         info: dict | None = None,
     ) -> tuple[Command, list]:
-        """Pick command sent to the quadrotor through a Crazyswarm/Crazyradio-like interface.
-
-        INSTRUCTIONS:
-            Re-implement this method to return the target position, velocity, acceleration,
-            attitude, and attitude rates to be sent from Crazyswarm to the Crazyflie using, e.g., a
-            `cmdFullState` call.
-
-        Args:
-            ep_time: Episode's elapsed time, in seconds.
-            obs: The environment's observation [drone_xyz_yaw, gates_xyz_yaw, gates_in_range,
-                obstacles_xyz, obstacles_in_range, gate_id].
-            reward: The reward signal.
-            done: Wether the episode has terminated.
-            info: Current step information as a dictionary with keys 'constraint_violation',
-                'current_target_gate_pos', etc.
-
-        Returns:
-            The command type and arguments to be sent to the quadrotor. See `Command`.
-        """
         iteration = int(ep_time * self.CTRL_FREQ)
-        #Print the keys of info
-        #print("Keys of info: ", info.keys())
-        #Keys of interest: gates_pose, gates_in_range, obstacles_pose, obstacles_in_range, gate_id
-        #Print the obstacle positions
-        #print("Obstacle positions: ", info["gates_pose"])
-
-        #########################
-        # REPLACE THIS (START) ##
-        #########################
-
-
-
-
-
-        # Handcrafted solution for getting_stated scenario.
+        drone_position = obs[0:3]  # Assuming obs contains the drone's current position at indices 0, 1, 2
 
         if not self._take_off:
             command_type = Command.TAKEOFF
@@ -259,14 +236,20 @@ class Controller(BaseController):
             step = iteration - 2 * self.CTRL_FREQ  # Account for 2s delay due to takeoff
             if ep_time - 2 > 0 and step < len(self.ref_x):
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
-                target_vel = np.zeros(3)
+                error = target_pos - drone_position
+                self.integral_error += error * self.CTRL_TIMESTEP
+                derivative_error = (error - self.prev_error) / self.CTRL_TIMESTEP
+
+                # PID output
+                control_output = self.kp * error + self.ki * self.integral_error + self.kd * derivative_error
+                self.prev_error = error
+
+                target_vel = control_output  # Assuming direct control of velocity
                 target_acc = np.zeros(3)
                 target_yaw = 0.0
                 target_rpy_rates = np.zeros(3)
                 command_type = Command.FULLSTATE
                 args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]
-            # Notify set point stop has to be called every time we transition from low-level
-            # commands to high-level ones. Prepares for landing
             elif step >= len(self.ref_x) and not self._setpoint_land:
                 command_type = Command.NOTIFYSETPOINTSTOP
                 args = []
@@ -281,10 +264,6 @@ class Controller(BaseController):
             else:
                 command_type = Command.NONE
                 args = []
-
-        #########################
-        # REPLACE THIS (END) ####
-        #########################
 
         return command_type, args
 
