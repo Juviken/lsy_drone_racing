@@ -1,30 +1,30 @@
 from __future__ import annotations
 import numpy as np
-
 from scipy.optimize import minimize
 from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
 from lsy_drone_racing.geometry import create_cylinder
-import csv
 
 class TrajGen:
     def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,obstacle_margin_gate=0.2, max_iterations=50, alpha=0.7, scaling_factor=1, use_initial=False):
-        """_summary_
+        """
+        Initialize the TrajGen class with waypoints, obstacles, and various parameters for trajectory generation and optimization.
 
         Args:
-            waypoints (_type_): _description_
-            obstacles (_type_): _description_ : list of obstacles in the form of numpy arrays
-            t2 (_type_): _description_
-            initial_guess (_type_, optional): _description_. Defaults to None.
-            duration (int, optional): _description_. Defaults to 10.
-            ctrl_freq (int, optional): _description_. Defaults to 30.
-            obstacle_margin (int, optional): _description_. Defaults to 2.
-            max_iterations (int, optional): _description_. Defaults to 50.
-            alpha (float, optional): _description_. Defaults to 0.7.
-            scaling_factor (int, optional): _description_. Defaults to 1.
-            use_initial (bool, optional): _description_. Defaults to False.
+            waypoints (np.ndarray): Array of waypoint coordinates.
+            obstacles (list): List of obstacles in the form of numpy arrays.
+            t2 (np.ndarray): Array of time instances corresponding to waypoints.
+            initial_guess (np.ndarray, optional): Initial guess for the trajectory. Defaults to None.
+            duration (int, optional): Duration of the trajectory. Defaults to 10.
+            ctrl_freq (int, optional): Control frequency. Defaults to 30.
+            obstacle_margin (int, optional): Margin for obstacle avoidance. Defaults to 2.
+            obstacle_margin_gate (float, optional): Margin for obstacle gate avoidance. Defaults to 0.2.
+            max_iterations (int, optional): Maximum iterations for optimization. Defaults to 50.
+            alpha (float, optional): Weight for total distance vs smoothness. Defaults to 0.7.
+            scaling_factor (int, optional): Scaling factor for the waypoints. Defaults to 1.
+            use_initial (bool, optional): Use the provided initial guess if True. Defaults to False.
         """
         self.waypoints = waypoints
         self.t2 = t2
@@ -36,19 +36,23 @@ class TrajGen:
         self.alpha = alpha
         self.scaling_factor = scaling_factor
 
-        self.initial_guess = initial_guess if use_initial and initial_guess is not None else self.generate_initial_guess()
+        self.initial_guess = initial_guess if use_initial and initial_guess is not None else self.generate_initial_guess() # Generate initial guess if not provided
         self.current_trajectory = None
         self.intermediate_trajectories = {'Initial Guess': self.initial_guess}
         self.optimization_iterations = 0
         self.obstacles = obstacles
-        self.obstacle_tree = self.create_obstacle_tree(obstacles[0:4])
-        self.obstacle_tree2 = self.create_obstacle_tree(obstacles[4:8])
+        self.obstacle_tree = self.create_obstacle_tree(obstacles[0:4])  # Create KD-tree for obstacles
+        self.obstacle_tree2 = self.create_obstacle_tree(obstacles[4:8]) # Create KD-tree for gates
 
         
 
-    
+
     def __str__(self):
-        #Return string representation of the last trajectory in intermediate_trajectories
+        """Return the string representation of the TrajGen object
+
+        Returns:
+            str: String representation of the TrajGen object.
+        """
         return str(self.intermediate_trajectories[f"Iteration{self.optimization_iterations-1}"])
 
     def generate_initial_guess(self):
@@ -61,16 +65,18 @@ class TrajGen:
     def create_obstacle_tree(self, obstacles):
         """Convert obstacles to a KD-tree for fast distance calculations."""
         obstacle_points = []
+        
         print("Creating obstacle tree...")
-        print("Length of obstacles: ", len(obstacles))
         for obs in obstacles:
-            
-            points = obs.obstacle_points
-            # Convert indices to coordinates
-            obstacle_points.extend(points)  # Add obstacle points to list
+            obstacle_points.extend(obs.obstacle_points)  # Add obstacle points to list
         return cKDTree(obstacle_points)     # Create KD-tree from list of obstacle points
     
     def plot_trajectory(self, trajectory):
+        """Plot a single trajectory in 3D space
+
+        Args:
+            trajectory (np.array): Trajectory to plot.
+        """
         if trajectory is None:
             print("No trajectory data to plot.")
             return
@@ -108,37 +114,40 @@ class TrajGen:
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         ax.set_title('Optimization Progress of 3D Trajectories')
-        ax.legend()
+        if legend:
+            ax.legend()
         plt.show()
 
-    def optimize_trajectory(self, plot_val=False):
+    def optimize_trajectory(self) -> np.ndarray:
         """Optimize the trajectory considering obstacles and waypoints."""
         print("Starting optimization...")
-        print("Starting lsy optimization")
+
         def callback(traj):
+            """"Callback function to store intermediate trajectories."""
             self.optimization_iterations += 1
             print(f"Iteration {self.optimization_iterations}")
             self.intermediate_trajectories[f"Iteration{self.optimization_iterations}"] = traj.reshape(-1, 3)
             self.current_trajectory = traj.reshape(-1, 3)
 
-        constraints = [self.inequality_constraint(),self.inequality_constraint2(), self.equality_constraint()]
-        initial_guess_flat = self.initial_guess.flatten()
+        constraints = [self.obstacle_inequality(),self.gate_inequality(), self.equality_constraint()] # Add constraints
+        initial_guess_flat = self.initial_guess.flatten() # Flatten initial guess for optimization
+        
+        #Start optimization using SciPy's minimize function, see https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html
         result = minimize(
-            lambda traj: self.smoothness_objective(traj),
-            initial_guess_flat,
-            constraints=constraints,
-            method='SLSQP',
-            callback=callback,
-            options={'maxiter': self.max_iterations}
+            lambda traj: self.combined_objective(traj),   # Objective function
+            initial_guess_flat,                             # Initial guess
+            constraints=constraints,                        # Constraints
+            method='SLSQP',                                 # Optimization method, SLSQP, see https://docs.scipy.org/doc/scipy/reference/optimize.minimize-slsqp.html
+            callback=callback,                              # Callback function to store intermediate trajectories and count iterations
+            options={'maxiter': self.max_iterations}        # Maximum number of iterations
         )
-        #smoothness_objective, combined_objective(alpha)
+        
         if not result.success:
             print(f"Optimization failed: {result.message}")
             return None
         optimized_trajectory = result.x.reshape(-1, 3)
         self.current_trajectory = optimized_trajectory
-        if plot_val:
-            self.plot_trajectory(optimized_trajectory)
+
         return optimized_trajectory
 
     def combined_objective(self, traj):
@@ -146,17 +155,17 @@ class TrajGen:
         alpha: weight for total distance vs smoothness, high alpha=more weight on total distance, low alpha=more weight on smoothness
         ."""
         traj = traj.reshape(-1, 3)
-        total_distance = np.sum(np.sqrt(np.sum(np.diff(traj, axis=0) ** 2, axis=1)))
+        total_distance = np.sum(np.sqrt(np.sum(np.diff(traj, axis=0) ** 2, axis=1))) #L2 norm of first derivative
         smoothness = np.sum(np.diff(traj, n=2, axis=0) ** 2) #L2 norm of second derivative
         return self.alpha * total_distance + (1 - self.alpha) * smoothness
     
     def smoothness_objective(self, traj):
         """Calculate smoothness cost of trajectory."""
-        traj = traj.reshape(-1, 3)
-        smoothness = np.sum(np.diff(traj, n=2, axis=0) ** 2)
+        traj = traj.reshape(-1, 3) #Reshape trajectory
+        smoothness = np.sum(np.diff(traj, n=2, axis=0) ** 2) #L2 norm of second derivative
         return smoothness
 
-    def inequality_constraint(self):
+    def obstacle_inequality(self):
         """Create inequality constraints based on obstacle avoidance."""
         def constraint(traj):
             traj = traj.reshape(-1, 3)
@@ -164,7 +173,7 @@ class TrajGen:
             return np.min(distances - self.obstacle_margin)
         return {'type': 'ineq', 'fun': constraint}
     
-    def inequality_constraint2(self):
+    def gate_inequality(self):
         
         def constraint(traj):
             traj = traj.reshape(-1, 3)
@@ -215,7 +224,7 @@ def main():
     run_optimization = True
     
     if run_optimization:
-        optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
+        optimized_trajectory = traj_gen.optimize_trajectory()
         #print intermediate trajectories
         traj_gen.plot_intermediate_trajectories()
         #Print final trajectory

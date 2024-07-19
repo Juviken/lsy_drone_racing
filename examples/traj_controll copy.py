@@ -34,7 +34,7 @@ from lsy_drone_racing.command import Command
 from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
 #from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
-from lsy_drone_racing.optimization_utils import TrajGen
+from lsy_drone_racing.normalized_class import TrajGen
 from lsy_drone_racing.planning_utils import Cylinder,gate_obstacle, waypoint_magic
 from scipy.spatial import cKDTree
 from matplotlib import pyplot as plt
@@ -92,7 +92,7 @@ class Controller(BaseController):
         #########################
         
         # PID parameters
-        self.kp = np.array([0.01, 0.01, 0.01])  # Proportional gains for x, y, z
+        self.kp = np.array([0.001, 0.001, 0.001])  # Proportional gains for x, y, z
         self.ki = np.array([0.001, 0.001, 0.001])  # Integral gains for x, y, z
         self.kd = np.array([0.1, 0.1, 0.1])  # Derivative gains for x, y, z
 
@@ -111,27 +111,37 @@ class Controller(BaseController):
         
         waypoints = []
         
-        first = [self.initial_obs[0], self.initial_obs[2], 0.3] #Start position
-        second = [1,0,z_low]    
+        first = [self.initial_obs[0], self.initial_obs[2], 0.3]
+        second = [1,0,z_low]
         start = np.array([first,second])
         
+        
+        #Print start position
 
         gates = self.NOMINAL_GATES
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
-
-
+        #Print gates
+        print("Gates")
+        print(gates [0][-1])
+        print(gates [1][-1])
+        print(gates [2][-1])
+        print(gates [3][-1])
+        #waypoints.append([1, 0, z_low])
         gatepoints = []
-        for i in range(len(gates)):
-            gatepoints.append([gates[i][0], gates[i][1], z_high if gates[i][-1] == 0 else z_low, gates[i][-2]])
-        # gatepoints.append([gates[0][0] , gates[0][1], z_high if gates[0][-1] == 0 else z_low, gates[0][-2]])
-        # gatepoints.append([gates[1][0], gates[1][1], z_high if gates[1][-1] == 0 else z_low, gates[1][-2]])
-        # gatepoints.append([gates[2][0], gates[2][1], z_high if gates[2][-1] == 0 else z_low, gates[2][-2]])
-        # gatepoints.append([gates[3][0], gates[3][1] , z_high if gates[3][-1] == 0 else z_low, gates[3][-2]])
+        gatepoints.append([gates[0][0] , gates[0][1], z_high if gates[0][-1] == 0 else z_low, gates[0][-2]])
+        gatepoints.append([gates[1][0], gates[1][1], z_high if gates[1][-1] == 0 else z_low, gates[1][-2]])
+        gatepoints.append([gates[2][0], gates[2][1], z_high if gates[2][-1] == 0 else z_low, gates[2][-2]])
+        gatepoints.append([gates[3][0], gates[3][1] , z_high if gates[3][-1] == 0 else z_low, gates[3][-2]])
         
+        waypoints.append([gates[0][0] , gates[0][1], z_low])
+        waypoints.append([gates[1][0], gates[1][1], z_high])
+        waypoints.append([gates[2][0], gates[2][1], z_low])
+
+        waypoints.append([gates[3][0], gates[3][1] , z_high])
         #Use waypoint magic
         waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.4)
-    
+        print("Waypoints",waypoints)
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
         
@@ -144,68 +154,50 @@ class Controller(BaseController):
         #Create obstacles
         obstacle_height = 0.9
         obstacle_radius = 0.15
-        obstacle_margin = 0.35
-        obstacles = []
-        #Create obstacle models, args: radius, height, position
-        for i in range(len(self.NOMINAL_OBSTACLES)):
-            obstacles.append(Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[i][0:3]))
-        # cyl1 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[0][0:3])
-        # cyl2 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[1][0:3])
-        # cyl3 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[2][0:3])
-        # cyl4 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[3][0:3])
+        obstacle_margin = 0.3
+        obstacle_positions = [self.NOMINAL_OBSTACLES[i][0:3] for i in range(4)]
+        cyl1 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[0][0:3])
+        cyl2 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[1][0:3])
+        cyl3 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[2][0:3])
+        cyl4 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[3][0:3])
         #Gate obstacles
-        # gate_obstacle1 = gate_obstacle(gates[0],z_high if gates [0][-1] == 1 else z_low)
-        # gate_obstacle2 = gate_obstacle(gates[1],z_high)
-        # gate_obstacle3 = gate_obstacle(gates[2],z_low)
-        # gate_obstacle4 = gate_obstacle(gates[3],z_high)
-        for i in range(len(gates)):
-            obstacles.append(gate_obstacle(gates[i],z_high if gates[i][-1] == 0 else z_low))
-        
-        #obstacles = [cyl1,cyl2,cyl3,cyl4,gate_obstacle1,gate_obstacle2,gate_obstacle3,gate_obstacle4]
+        gate_obstacle1 = gate_obstacle(gates[0],z_high if gates [0][-1] == 1 else z_low)
+        gate_obstacle2 = gate_obstacle(gates[1],z_high)
+        gate_obstacle3 = gate_obstacle(gates[2],z_low)
+        gate_obstacle4 = gate_obstacle(gates[3],z_high)
+        obstacles = [cyl1,cyl2,cyl3,cyl4,gate_obstacle1,gate_obstacle2,gate_obstacle3,gate_obstacle4]
         
         
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
-        duration = 8
+        duration = 14
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
-        
-        #Load trajectory from file
-        initial_traj = np.loadtxt("success_10sec.csv", delimiter=',')
-        
-        #Create trajectory generator
-        traj_gen = TrajGen(
-            waypoints,                          # Waypoints
-            obstacles,                          # Obstacles
-            t2,
-            initial_guess=initial_traj,                         # Trajectory for initial guess
-            duration=duration,                  # Duration of the trajectory
-            ctrl_freq=30,
-            obstacle_margin=obstacle_margin,
-            obstacle_margin_gate=0.25, 
-            max_iterations=30,
-            alpha=0.3,
-            use_initial=True)
+        traj_gen = TrajGen(waypoints, obstacles,t2,trajectory,duration,ctrl_freq=30,obstacle_margin=0.35,obstacle_margin_gate=0.25, max_iterations=50,alpha=0.3,use_initial=False)
         print("Trajectory object created")
         
-        self.run_opt = True
+
         
+        self.run_opt = False
         if self.run_opt:
-            optimized_trajectory = traj_gen.optimize_trajectory() #Optimize the trajectory
-            print("Optimized trajectory")
-            
+            optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
+            #print(optimized_trajectory)
+            #Save final trajectory
+            print("Hej")
             traj_gen.save_trajectory('optimized_trajectory.csv')
-            print("Trajectory saved")
             current_traj = traj_gen.give_current()
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
         
         else:
             print("Plotting from file...")
-            filename = "optimized_trajectory.csv"
+            filename = "optimized_trajectory_test.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
            
+        
+
+        tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         self.waypoints = waypoints
 
         

@@ -236,7 +236,7 @@ def main():
         traj_gen.save_trajectory('optimized_trajectory_test.csv')
         
     else:
-        traj_gen.plot_from_csv('optimized_trajectory_test.csv')
+        traj_gen.plot_from_csv('optimized_trajectory.csv')
 
 if __name__ == '__main__':
     main()
