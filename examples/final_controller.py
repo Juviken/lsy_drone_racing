@@ -12,7 +12,7 @@ from lsy_drone_racing.optimization_utils import TrajGen
 from lsy_drone_racing.planning_utils import Cylinder,gate_obstacle, waypoint_magic
 from scipy.spatial import cKDTree
 from matplotlib import pyplot as plt
-from IPython import display
+
 import math
 class Controller(BaseController):
     """Template controller class."""
@@ -69,14 +69,7 @@ class Controller(BaseController):
         self.ki = np.array([0.001, 0.0001, 0.0001])  # Integral gains for x, y, z
         self.kd = np.array([0.01, 0.01, 0.01])  # Derivative gains for x, y, z
         
-         # Derivative filter parameters
-        self.derivative_filter_tau = 0.1  # Time constant for the low-pass filter
-        self.derivative_dt = self.CTRL_TIMESTEP  # Sampling interval
-        self.filtered_derivative_error = np.zeros(3)
-        
-        # Integral anti-windup
-        self.max_integral = np.array([10, 10, 10])  # Max integral term for anti-windup
-        
+
 
         # Error accumulators
         self.integral_error = np.zeros(3)
@@ -177,12 +170,6 @@ class Controller(BaseController):
         self._setpoint_land = False
         self._land = False
 
-    def compute_yaw_to_target(self, current_pos, target_pos):
-        # Calculate the desired yaw angle to face the target position
-        delta_x = target_pos[0] - current_pos[0]
-        delta_y = target_pos[1] - current_pos[1]
-        desired_yaw = math.atan2(delta_y, delta_x)  # Desired yaw angle,
-        return desired_yaw
 
     def compute_control(
         self,
@@ -194,7 +181,7 @@ class Controller(BaseController):
     ) -> tuple[Command, list]:
         iteration = int(ep_time * self.CTRL_FREQ)
         drone_position = obs[0:3]  # x, y, z position
-        drone_acceleration = obs[3:6]  # x, y, z acceleration
+        drone_velocity = obs[3:6]  # x, y, z acceleration
         drone_attitude = obs[6:9]  # phi (roll), theta (pitch), psi (yaw)
         #print("Viktigt",info.keys())
 
@@ -204,23 +191,33 @@ class Controller(BaseController):
             self._take_off = True
         else:
             step = iteration - 2 * self.CTRL_FREQ
+            #Print gates in range
+            print("Gates in range:",info["gates_in_range"])
             if ep_time - 2 > 0 and step < len(self.ref_x):
+                
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
                 error = target_pos - drone_position
                 self.integral_error += error * self.CTRL_TIMESTEP
                 derivative_error = (error - self.prev_error) / self.CTRL_TIMESTEP
 
-                # PID outputs for attitude control
-                roll_output = self.kp[1] * error[1] + self.ki[1] * self.integral_error[1] + self.kd[1] * derivative_error[1]    # Roll, positive is right
-                pitch_output = -self.kp[0] * error[0] - self.ki[0] * self.integral_error[0] - self.kd[0] * derivative_error[0]  # Pitch, positive is forward
+                pid_output = (
+                    self.kp * error +
+                    self.ki * self.integral_error +
+                    self.kd * derivative_error
+                )
                 
-               
-                desired_yaw = self.compute_yaw_to_target(drone_position, target_pos)    # Yaw, positive is clockwise
+                
 
-                target_rpy = [roll_output, pitch_output, desired_yaw]  # roll, pitch, yaw targets
+                #target_velocity = np.zeros(3)  # Assume target velocity to be zero for now
+                target_velocity = pid_output
+                target_acc = np.zeros(3)  # Assume target acceleration to be zero for now
+                target_yaw = 0.0
+                target_rpy = [0, 0, 0]
+
+                self.prev_error = error
+                
                 command_type = Command.FULLSTATE
-                #[pos, vel, acc, yaw, rpy_rate]
-                args = [target_pos, np.zeros(3), np.zeros(3), 0.0, target_rpy, ep_time]
+                args = [target_pos, target_velocity, target_acc, target_yaw, target_rpy, ep_time]
 
                 self.prev_error = error
             elif step >= len(self.ref_x) and not self._setpoint_land:

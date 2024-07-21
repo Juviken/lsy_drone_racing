@@ -24,8 +24,9 @@ class TrajGen:
             self.initial_guess = initial_guess
         else:
             self.initial_guess = self.generate_initial_guess()
-        self.current_trajectory = None
+        
         self.intermediate_trajectories = {'Initial Guess': self.initial_guess}
+        self.current_trajectory = self.initial_guess
         self.optimization_iterations = 0
         self.obstacles = obstacles
         self.obstacle_tree = self.create_obstacle_tree(obstacles)
@@ -106,6 +107,9 @@ class TrajGen:
         print("Starting optimization...")
         print("Starting lsy optimization")
         def callback(traj):
+            """"Callback function to store intermediate trajectories."""
+            self.ref_x, self.ref_y, self.ref_z = self.current_trajectory[:, 0],self.current_trajectory[:, 1],self.current_trajectory[:, 2]
+            assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
             self.optimization_iterations += 1
             print(f"Iteration {self.optimization_iterations}")
             self.intermediate_trajectories[f"Iteration{self.optimization_iterations}"] = traj.reshape(-1, 3)
@@ -114,7 +118,7 @@ class TrajGen:
         constraints = [self.inequality_constraint(), self.equality_constraint()]
         initial_guess_flat = self.initial_guess.flatten()
         result = minimize(
-            lambda traj: self.smoothness_objective(traj),
+            lambda traj: self.combined_objective(traj),
             initial_guess_flat,
             constraints=constraints,
             method='SLSQP',
@@ -183,7 +187,7 @@ def main():
     obstacle_radius = 0.15
     z_low = 0.525
     z_high = 1.0
-    gate_radius = 0.3
+    gate_radius = 0.225
 
     gatepoints = np.array(give_gate())
     waypoints = gatepoints
@@ -220,23 +224,22 @@ def main():
 
     
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=14, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=50,alpha=0.1,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2, duration=8, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=40,alpha=0.1,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
-    run_optimization = False
+    run_optimization = True
     
     if run_optimization:
         optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
         #print intermediate trajectories
         traj_gen.plot_intermediate_trajectories()
-        #Print final trajectory
-        print(traj_gen.intermediate_trajectories[f"Iteration{traj_gen.optimization_iterations}"])
-        #Print shape of final trajectory
-        print(traj_gen.intermediate_trajectories[f"Iteration{traj_gen.optimization_iterations}"].shape)
+
+        #plot final trajectorey
+        traj_gen.plot_trajectory(traj_gen.intermediate_trajectories[f"Iteration{traj_gen.optimization_iterations}"])
         #Save final trajectory
         traj_gen.save_trajectory('optimized_trajectory_test.csv')
         
     else:
-        traj_gen.plot_from_csv('optimized_trajectory.csv')
+        traj_gen.plot_from_csv('optimized_trajectory_test.csv')
 
 if __name__ == '__main__':
     main()

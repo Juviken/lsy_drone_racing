@@ -1,14 +1,11 @@
-#   Nominal information used for testing the drone racing environment.
-# 
-# gates:
+#   gates:
 #     [  # x, y, z, r, p, y, type (0: `tall` obstacle, 1: `low` obstacle)
 #       [0.45, -1.0, 0, 0, 0, 2.35, 1],
 #       [1.0, -1.55, 0, 0, 0, -0.78, 0],
 #       [0.0, 0.5, 0, 0, 0, 0, 1],
 #       [-0.5, -0.5, 0, 0, 0, 3.14, 0]
 #     ]
-#   Gate yaw from radians to degrees
-#       [2.45:140,-0.78:-45,0.0:0,-0.5:180]
+#
 #       z_low = 0.525
 #       z_high = 1.0
 #   obstacles:
@@ -18,13 +15,11 @@
 #       [-0.5, 0, 0, 0, 0, 0],
 #       [0, 1.0, 0, 0, 0, 0]
 #     ]
-
-
-
+    
 def give_gate():
     z_low = 0.525
     z_high = 1.0
-    return [[0.45, -1.0, z_high, 0, 0, 2.35, 1],[1.0, -1.55, z_low, 0, 0, -0.78, 0],[0.0, 0.5, z_high, 0, 0, 0, 1],[-0.5, -0.5, z_low, 0, 0, 3.14, 0]]
+    return [[0.45, -1.0, z_low, 0, 0, 2.35, 1],[1.0, -1.55, z_high, 0, 0, -0.78, 0],[0.0, 0.5, z_low, 0, 0, 0, 1],[-0.5, -0.5, z_high, 0, 0, 3.14, 0]]
     
     
 def give_obst():

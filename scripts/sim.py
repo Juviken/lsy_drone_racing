@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
+import sys
 from functools import partial
 from pathlib import Path
 
@@ -30,10 +31,10 @@ logger = logging.getLogger(__name__)
 
 def simulate(
     config: str = "config/level1.yaml",
-    controller: str = "examples/traj_controll.py",
+    controller: str = "examples/final_controller.py",
     n_runs: int = 1,
     gui: bool = True,
-    terminate_on_lap: bool = False,
+    terminate_on_lap: bool = True,
 ) -> list[float]:
     """Evaluate the drone controller over multiple episodes.
 
@@ -74,8 +75,6 @@ def simulate(
     path = Path(__file__).parents[1] / controller
     ctrl_class = load_controller(path)  # This returns a class, not an instance
 
-    #plotting the environment with matplotlib
-
     # Create a statistics collection
     stats = {
         "ep_reward": 0,
@@ -86,6 +85,7 @@ def simulate(
     }
     ep_times = []
 
+    
     # Run the episodes.
     for _ in range(n_runs):
         ep_start = time.time()
@@ -93,6 +93,7 @@ def simulate(
         action = np.zeros(4)
         reward = 0
         obs, info = wrapped_env.reset()
+
         info["ctrl_timestep"] = CTRL_DT
         info["ctrl_freq"] = CTRL_FREQ
         lap_finished = False
@@ -137,10 +138,12 @@ def simulate(
                 sync(i, ep_start, CTRL_DT)
             i += 1
             # Break early after passing the last gate (=> gate -1) or task completion
-            if terminate_on_lap and info["current_target_gate_id"] == -1:
+            if terminate_on_lap and info["current_gate_id"] == -1:
                 info["task_completed"], lap_finished = True, True
             if info["task_completed"]:
                 done = True
+
+        
 
         # Learn after the episode if the controller supports it
         ctrl.episode_learn()  # Update the controller internal state and models.
@@ -151,16 +154,22 @@ def simulate(
         stats["collisions"] = 0
         stats["collision_objects"] = set()
         stats["violations"] = 0
-        ep_times.append(curr_time if info["current_target_gate_id"] == -1 else None)
+        ep_times.append(curr_time if info["current_gate_id"] == -1 else None)
+
 
     # Close the environment
+    
+    #Print the final statistics, mean episode time, number of failed episodes, etc.
+    print(f"Mean episode time: {np.mean([t for t in ep_times if t is not None])}")
+    print(f"Number of failed episodes: {len([t for t in ep_times if t is None])}")
+    
     env.close()
     return ep_times
 
 
 def log_episode_stats(stats: dict, info: dict, config: Munch, curr_time: float, lap_finished: bool):
     """Log the statistics of a single episode."""
-    stats["gates_passed"] = info["current_target_gate_id"]
+    stats["gates_passed"] = info["current_gate_id"]
     if stats["gates_passed"] == -1:  # The drone has passed the final gate
         stats["gates_passed"] = len(config.quadrotor_config.gates)
     if config.quadrotor_config.done_on_collision and info["collision"][1]:
@@ -181,6 +190,10 @@ def log_episode_stats(stats: dict, info: dict, config: Munch, curr_time: float, 
             f"Number of constraint violations: {stats['violations']}\n"
         )
     )
+    
+    
+    
+
 
 
 if __name__ == "__main__":

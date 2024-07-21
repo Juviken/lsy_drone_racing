@@ -49,7 +49,7 @@ class Controller(BaseController):
         initial_obs: np.ndarray,
         initial_info: dict,
         buffer_size: int = 100,
-        verbose: bool = False,
+        verbose: bool = True,
     ):
         """Initialization of the controller.
 
@@ -75,13 +75,13 @@ class Controller(BaseController):
         self.initial_obs = initial_obs
         self.VERBOSE = verbose
         self.BUFFER_SIZE = buffer_size
-        
-        #Print the keys of initial_info
-        print("Keys of initial_info: ", initial_info.keys())
 
         # Store a priori scenario information.
         self.NOMINAL_GATES = initial_info["nominal_gates_pos_and_type"]
         self.NOMINAL_OBSTACLES = initial_info["nominal_obstacles_pos"]
+                
+        z_low = initial_info["gate_dimensions"]["low"]["height"]+0.05
+        z_high = initial_info["gate_dimensions"]["tall"]["height"]+0.05
 
         # Reset counters and buffers.
         self.reset()
@@ -92,85 +92,61 @@ class Controller(BaseController):
         #########################
         
         # PID parameters
-        self.kp = np.array([0.01, 0.01, 0.01])  # Proportional gains for x, y, z
-        self.ki = np.array([0.001, 0.001, 0.001])  # Integral gains for x, y, z
+        self.kp = np.array([0.0, 0.0, 0.0])  # Proportional gains for x, y, z
+        self.ki = np.array([0.00, 0.00, 0.00])  # Integral gains for x, y, z
         self.kd = np.array([0.1, 0.1, 0.1])  # Derivative gains for x, y, z
 
         # Error accumulators
         self.integral_error = np.zeros(3)
         self.prev_error = np.zeros(3)
-        
-        self.run_opt = False
-        print("Gate Dimensions: ", initial_info["gate_dimensions"])
-      
-        
+       
         gates = self.NOMINAL_GATES
-        z_low = initial_info["gate_dimensions"]["low"]["height"]-0.1
-        z_high = initial_info["gate_dimensions"]["tall"]["height"]-0.1
-        
         
         waypoints = []
         
         first = [self.initial_obs[0], self.initial_obs[2], 0.3] #Start position
         second = [1,0,z_low]    
-        start = np.array([first,second])
-        
-
-        gates = self.NOMINAL_GATES
-        z_low = initial_info["gate_dimensions"]["low"]["height"]
-        z_high = initial_info["gate_dimensions"]["tall"]["height"]
-
+        start = np.array([first])
 
         gatepoints = []
         for i in range(len(gates)):
-            gatepoints.append([gates[i][0], gates[i][1], z_high if gates[i][-1] == 0 else z_low, gates[i][-2]])
-        # gatepoints.append([gates[0][0] , gates[0][1], z_high if gates[0][-1] == 0 else z_low, gates[0][-2]])
-        # gatepoints.append([gates[1][0], gates[1][1], z_high if gates[1][-1] == 0 else z_low, gates[1][-2]])
-        # gatepoints.append([gates[2][0], gates[2][1], z_high if gates[2][-1] == 0 else z_low, gates[2][-2]])
-        # gatepoints.append([gates[3][0], gates[3][1] , z_high if gates[3][-1] == 0 else z_low, gates[3][-2]])
+            gatepoints.append([gates[i][0], gates[i][1], z_high if gates[i][-1] == 0 else z_low, gates[i][-2]]) #Add gate waypoints
         
-        #Use waypoint magic
-        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.4)
+        #Use waypoint magic - args: gatepoints, buffer_distance
+        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)    #Add waypoints before and after gate to force straight passage
     
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
         
-        last_point = [initial_info["x_reference"][0],initial_info["x_reference"][2],initial_info["x_reference"][4]]
+        last_point = [initial_info["x_reference"][0],initial_info["x_reference"][2],initial_info["x_reference"][4]] #End position
         waypoints = np.concatenate((waypoints,[last_point]),axis=0)
-        #Print end position
-
         waypoints = np.array(waypoints)
     
-        #Create obstacles
+        #Define obstacle dimensions
         obstacle_height = 0.9
         obstacle_radius = 0.15
-        obstacle_margin = 0.35
+
         obstacles = []
+        
         #Create obstacle models, args: radius, height, position
         for i in range(len(self.NOMINAL_OBSTACLES)):
             obstacles.append(Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[i][0:3]))
-        # cyl1 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[0][0:3])
-        # cyl2 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[1][0:3])
-        # cyl3 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[2][0:3])
-        # cyl4 = Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[3][0:3])
-        #Gate obstacles
-        # gate_obstacle1 = gate_obstacle(gates[0],z_high if gates [0][-1] == 1 else z_low)
-        # gate_obstacle2 = gate_obstacle(gates[1],z_high)
-        # gate_obstacle3 = gate_obstacle(gates[2],z_low)
-        # gate_obstacle4 = gate_obstacle(gates[3],z_high)
+        
+        #Create gate obstacles
         for i in range(len(gates)):
             obstacles.append(gate_obstacle(gates[i],z_high if gates[i][-1] == 0 else z_low))
         
-        #obstacles = [cyl1,cyl2,cyl3,cyl4,gate_obstacle1,gate_obstacle2,gate_obstacle3,gate_obstacle4]
-        
         
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
-        duration = 8
+        duration = 8   #Duration of the trajectory
+        
+        #Create an initial trajectory - optional
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
         trajectory = interpolate.splev(t, tck)
+        trajectory = np.array(trajectory).T
         
-        #Load trajectory from file
+        #Load trajectory from file - optional
         initial_traj = np.loadtxt("success_10sec.csv", delimiter=',')
         
         #Create trajectory generator
@@ -178,17 +154,17 @@ class Controller(BaseController):
             waypoints,                          # Waypoints
             obstacles,                          # Obstacles
             t2,
-            initial_guess=initial_traj,                         # Trajectory for initial guess
+            initial_guess=trajectory,         # Trajectory for initial guess
             duration=duration,                  # Duration of the trajectory
             ctrl_freq=30,
-            obstacle_margin=obstacle_margin,
-            obstacle_margin_gate=0.25, 
-            max_iterations=30,
-            alpha=0.3,
-            use_initial=True)
+            obstacle_margin=0.25,
+            obstacle_margin_gate=0.225, 
+            max_iterations=150,
+            alpha=0.1,
+            use_initial=False)
         print("Trajectory object created")
         
-        self.run_opt = True
+        self.run_opt = False
         
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory() #Optimize the trajectory
@@ -201,7 +177,7 @@ class Controller(BaseController):
         
         else:
             print("Plotting from file...")
-            filename = "optimized_trajectory.csv"
+            filename = "optimized_trajectory_test.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
@@ -253,8 +229,8 @@ class Controller(BaseController):
                 self.prev_error = error
 
                 target_vel = control_output  # Assuming direct control of velocity
-                target_acc = np.zeros(3)
-                target_yaw = 0.0
+                target_acc = np.zeros(3)    
+                target_yaw = 0.0             
                 target_rpy_rates = np.zeros(3)
                 command_type = Command.FULLSTATE
                 args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]

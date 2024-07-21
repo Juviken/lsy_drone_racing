@@ -6,8 +6,8 @@ from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
-from lsy_drone_racing.gats_obs import give_gate, give_obst
 
+from gats_obs import give_gate, give_obst
 import csv
 
 class Cylinder:
@@ -17,9 +17,9 @@ class Cylinder:
         self.x_center = center[0]
         self.y_center = center[1]
         self.z_center = center[2]
-        self.obstacle_points = self.cylinder_points()
+        self.obstacle_points = self.obstacle_points()
       
-    def cylinder_points(self):
+    def obstacle_points(self):
         #Numpy array of all points between the base and the top of the cylinder3
         return np.array([[self.x_center, self.y_center, z + (self.height/2)] for z in np.linspace(self.z_center - self.height/2, self.z_center + self.height/2, 10)])
     
@@ -44,32 +44,38 @@ class gate_obstacle:
         bottom = np.array([self.x, self.y, self.z - self.radius])
         dx = self.radius * np.cos(self.yaw)
         dy = self.radius * np.sin(self.yaw)
-        left = np.array([self.x - dx, self.y - dy, self.z])
-        right = np.array([self.x + dx, self.y + dy, self.z])
+        
+        #Corners of the gate
         top_left = np.array([self.x - dx, self.y - dy, self.z + self.radius])
         top_right = np.array([self.x + dx, self.y + dy, self.z + self.radius])
         bottom_left = np.array([self.x - dx, self.y - dy, self.z - self.radius])
         bottom_right = np.array([self.x + dx, self.y + dy, self.z - self.radius])
-        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right])
+        
+        #Generate 5 points in-between each of the corners
+        #Top row
+        top_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z + self.radius])
+        bottom_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z - self.radius])
+        top_right_inter = np.array([self.x + dx/2, self.y + dy/2, self.z + self.radius])
+        bottom_right_inter = np.array([self.x + dx/2, self.y + dy/2, self.z - self.radius])
+        left_top_inter = np.array([self.x - dx, self.y - dy, self.z + self.radius/2])
+        left_bottom_inter = np.array([self.x - dx, self.y - dy, self.z - self.radius/2])
+        right_top_inter = np.array([self.x + dx, self.y + dy, self.z + self.radius/2])
+        right_bottom_inter = np.array([self.x + dx, self.y + dy, self.z - self.radius/2])
+        
+        
+        
+        left = np.array([self.x - dx, self.y - dy, self.z])
+        right = np.array([self.x + dx, self.y + dy, self.z])
+        #Calculate the distance between left and right
+        diff = np.linalg.norm(left-right)
+        print("Diff",diff)
+        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right,top_left_inter,bottom_left_inter,top_right_inter,bottom_right_inter,left_top_inter,left_bottom_inter, right_top_inter,right_bottom_inter])
+        
+    def __str__(self) -> str:
+        return str(self.gate_points)
 
-def plot_stuff  (obstacles,waypoints):
-    #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,2]
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlim(-3, 3)
-    ax.set_ylim(-3, 3)
-    ax.set_zlim(0, 2)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title('Obstacles and Waypoints')
-    for obstacle in obstacles:
-        ax.plot(obstacle.cylinder_points[:,0], obstacle.cylinder_points[:,1], obstacle.cylinder_points[:,2], color='r')
-    ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
-    plt.show()
+
     
-import numpy as np
-
 def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.ndarray:
     """
     Take gate waypoint information like x, y, z, and rotation and return the waypoints with new waypoints
@@ -83,40 +89,61 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
     Returns:
         np.ndarray: Modified waypoints array including additional waypoints before and after each gate.
     """
-    hard_coded = False
+    print("Input to magic:",waypoints)
     new_waypoints = []
     for i in range(len(waypoints)):
         # Extract the current waypoint, order is x, y, z,yaw
         x, y, z = waypoints[i, 0:3]
-        yaw = waypoints[i, 3]
+        yaw = waypoints[i, 5]
         
 
         # Calculate direction vector for the buffer distance before and after the gate
-        dx = buffer_distance * np.cos(yaw+np.pi/2)
-        dy = buffer_distance * np.sin(yaw+np.pi/2)
+        dx = buffer_distance * np.cos(yaw+(np.pi/2))
+        dy = buffer_distance * np.sin(yaw+(np.pi/2))
         #Print dx and dy
-   
+        print(f"Yaw{i}",yaw)
+        print(f"dx{i}",dx)
+        print("dy:",dy)
         # Waypoint before the gate
-        waypoint_after = [x + dx, y + dy, z]
-        waypoint_before= [x - dx, y - dy, z]
-    
+        
+        waypoint_before= [x + dx, y + dy, z]
+        waypoint_after = [x - dx, y - dy, z]
         
 
         # Original waypoint (at the gate)
-        new_waypoints.append(waypoint_before)
-    
         
-        new_waypoints.append([x, y, z])
+    
         new_waypoints.append(waypoint_after)
+        new_waypoints.append([x, y, z])
+        new_waypoints.append(waypoint_before)
+        
         #new_waypoints.append([x, y, z])
         
         # Waypoint after the gate
+        
+        print("New waypoints:",new_waypoints)
 
     return np.array(new_waypoints)
 
+def plot_stuff  (obstacles,waypoints):
+    #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,6]
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlim(-3, 3)
+    ax.set_ylim(-3, 3)
+    ax.set_zlim(0, 2)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Obstacles and Waypoints')
+    for obstacle in obstacles:
+        ax.plot(obstacle.obstacle_points[:,0], obstacle.obstacle_points[:,1], obstacle.obstacle_points[:,2], color='r')
+    ax.plot(waypoints[:,0], waypoints[:,1], waypoints[:,2], color='b')
+    #Add limits to plot
+    ax.set_xlim(-3, 3)
+    ax.set_ylim(-3, 3)
+    plt.show()
 
-
-    
 
 def main():
     
@@ -138,16 +165,6 @@ def main():
 
     obstacles = [cylinder1, cylinder2, cylinder3, cylinder4]
     print("Object1",cylinder1)
-    # Example usage:
-    original_waypoints = np.array([
-        [0, 0, 1, 0],   # [x, y, z, yaw] format
-        [5, 5, 1, 45],
-        [10, 0, 1, 0]
-    ])
-
-    # Process waypoints to add buffer waypoints
-    processed_waypoints = waypoint_magic(original_waypoints)
-    print(processed_waypoints)
         
     plot_stuff(obstacles,waypoints)
     
