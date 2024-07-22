@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Juviken Hultman
+    given-names: Emil
+    orcid: https://orcid.org/009-0002-9222-7802
+title: "Autonomous drone flight system"
+version: 1.0.0
+
+date-released: 20224-07-22

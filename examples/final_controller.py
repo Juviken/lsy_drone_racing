@@ -45,7 +45,7 @@ class Controller(BaseController):
         # Define PID controllers
         self.initialize_pid_controllers()
         
-        self.target_yaw = np.pi/8  # Target yaw angle
+        self.target_yaw = np.pi/16 # Target yaw angle
         
         # Generate and optimize trajectory
         self.waypoints, self.ref_x, self.ref_y, self.ref_z = self.generate_trajectory(initial_info, z_high, z_low)
@@ -66,7 +66,7 @@ class Controller(BaseController):
         self.ki_pos = 0.001
         self.kd_pos = 0.01
         
-        self.pos_pid = PIDController(np.array([self.kp_pos]), np.array([self.ki_pos]*3), np.array([self.kd_pos]*3), dt)
+        self.pos_pid = PIDController(np.array([self.kp_pos,self.kp_pos,self.kp_pos]), np.array([self.ki_pos]*3), np.array([self.kd_pos]*3), dt)
         
         # Define PID gains for attitude control
         self.kp_att = 0.1
@@ -75,27 +75,28 @@ class Controller(BaseController):
 
     def generate_trajectory(self, initial_info, z_high, z_low):
         """Generate the trajectory for the drone."""
-        gates = self.NOMINAL_GATES
+        gates = self.NOMINAL_GATES              #Save the nominal gate positions
         
         start = np.array([[self.initial_obs[0], self.initial_obs[2], 0.3]])  # Add the starting position of the drone
         
-        gatepoints = [[g[0], g[1], z_high if g[-1] == 0 else z_low, g[-2]] for g in gates]
+        gatepoints = [[g[0], g[1], z_high if g[-1] == 0 else z_low, g[-2]] for g in gates]  # Add the gate positions
         
-        waypoints = waypoint_magic(np.array(gatepoints), buffer_distance=0.35)
+        waypoints = waypoint_magic(np.array(gatepoints), buffer_distance=0.35)  #Add buffer waypoints, see planning_utils.py for more info
         waypoints = np.concatenate((start, waypoints), axis=0)
         
         last_point = [initial_info["x_reference"][0], initial_info["x_reference"][2], initial_info["x_reference"][4]]
         waypoints = np.concatenate((waypoints, [last_point]), axis=0)
         waypoints = np.array(waypoints)
     
+        #Obstacle parameters, tailored to current setup
         obstacle_height = 0.9
         obstacle_radius = 0.15
 
-        obstacles = [Cylinder(obstacle_radius, obstacle_height, pos[:3]) for pos in self.NOMINAL_OBSTACLES]
-        obstacles.extend([gate_obstacle(g, z_high if g[-1] == 0 else z_low) for g in gates])
+        obstacles = [Cylinder(obstacle_radius, obstacle_height, pos[:3]) for pos in self.NOMINAL_OBSTACLES] #Create obstacle models
+        obstacles.extend([gate_obstacle(g, z_high if g[-1] == 0 else z_low) for g in gates])                #Add gate obstacles
         
         t2 = np.linspace(0, 1, waypoints.shape[0])
-        duration = 10
+        duration = 8    #Duration of the trajectory in seconds
         
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ))
         tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
@@ -112,19 +113,19 @@ class Controller(BaseController):
             ctrl_freq=30,
             obstacle_margin=0.3,
             obstacle_margin_gate=0.2,
-            max_iterations=20,
+            max_iterations=10,
             alpha=0.01,
             use_initial=False
         )
         
-        self.run_opt = False
+        self.run_opt = True
         
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory()
             traj_gen.save_trajectory('trajectory/optimized_trajectory.csv')
             current_traj = traj_gen.give_current()
         else:
-            filename = "trajectory/success_10sec.csv"
+            filename = "trajectory/success_8sec.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
         
@@ -143,16 +144,17 @@ class Controller(BaseController):
     ) -> tuple[Command, list]:
         iteration = int(ep_time * self.CTRL_FREQ)
         drone_position = obs[0:3]
-        drone_velocity = obs[3:6]
         drone_attitude = obs[6:9]
 
         if not self._take_off:
             command_type = Command.TAKEOFF
             args = [0.3, 2]  # Height, duration
             self._take_off = True
+            
         else:
             step = iteration - 2 * self.CTRL_FREQ  # Account for 2s delay due to takeoff
             if ep_time - 2 > 0 and step < len(self.ref_x):
+                
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
                 
                 # Compute position error
@@ -162,7 +164,7 @@ class Controller(BaseController):
                 desired_att = self.pos_pid.compute(pos_error)
                 desired_roll = desired_att[1]  # Assuming roll is affected by y-error
                 desired_pitch = desired_att[0]  # Assuming pitch is affected by x-error
-                desired_yaw = self.target_yaw  # Assuming we want to keep yaw constant
+                desired_yaw = self.target_yaw  # Assuming we want to keep yaw constant, optimally this would be computed by trajectory planner
 
                 # Compute attitude error
                 att_error = np.array([desired_roll, desired_pitch, desired_yaw]) - drone_attitude

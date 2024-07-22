@@ -254,7 +254,7 @@ def main():
 
     traj_gen = TrajGen(waypoints, obstacles, t2,initial_guess=initial_guess, duration=10, ctrl_freq=30, obstacle_margin=0.4,gate_margin=0.2, max_iterations=50,alpha=0.0,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
-    run_optimization = True
+    run_optimization = False
     
     if run_optimization:
         optimized_trajectory = traj_gen.optimize_trajectory(plot_val=False)
