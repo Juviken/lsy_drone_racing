@@ -65,15 +65,22 @@ class Controller(BaseController):
         #########################
         
         # PID parameters
-        self.kp = np.array([0.001, 0.001, 0.001])  # Proportional gains for x, y, z
-        self.ki = np.array([0.001, 0.0001, 0.0001])  # Integral gains for x, y, z
+        self.kp = np.array([0.01, 0.01, 0.01])  # Proportional gains for x, y, z
+        self.ki = np.array([0.001, 0.001, 0.001])  # Integral gains for x, y, z
         self.kd = np.array([0.01, 0.01, 0.01])  # Derivative gains for x, y, z
+        
+        # Acceleration PID parameters
+        self.kp_acc = np.array([0.0, 0.0, 0.0])
+        self.ki_acc = np.array([0.0, 0.0, 0.0])
+        self.kd_acc = np.array([0.0, 0.0, 0.0])
         
 
 
         # Error accumulators
         self.integral_error = np.zeros(3)
         self.prev_error = np.zeros(3)
+        self.integral_error_vel = np.zeros(3)
+        self.prev_error_vel = np.zeros(3)
        
         gates = self.NOMINAL_GATES
         
@@ -113,7 +120,7 @@ class Controller(BaseController):
         
         
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
-        duration = 8   #Duration of the trajectory
+        duration = 8  #Duration of the trajectory
         
         #Create an initial trajectory - optional
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
@@ -133,13 +140,13 @@ class Controller(BaseController):
             duration=duration,                  # Duration of the trajectory
             ctrl_freq=30,
             obstacle_margin=0.25,
-            obstacle_margin_gate=0.225, 
-            max_iterations=150,
-            alpha=0.1,
+            obstacle_margin_gate=0.2, 
+            max_iterations=50,
+            alpha=0.00,
             use_initial=False)
         print("Trajectory object created")
         
-        self.run_opt = False
+        self.run_opt = True
         
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory() #Optimize the trajectory
@@ -152,7 +159,7 @@ class Controller(BaseController):
         
         else:
             print("Plotting from file...")
-            filename = "trajectory/success_8sec.csv"
+            filename = "trajectory/optimized_trajectory.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
@@ -200,17 +207,27 @@ class Controller(BaseController):
                 self.integral_error += error * self.CTRL_TIMESTEP
                 derivative_error = (error - self.prev_error) / self.CTRL_TIMESTEP
 
-                pid_output = (
+                target_velocity = (
                     self.kp * error +
                     self.ki * self.integral_error +
                     self.kd * derivative_error
                 )
                 
+                vel_error = target_velocity - drone_velocity
+                self.integral_error_vel += vel_error * self.CTRL_TIMESTEP
+                derivative_vel_error = (vel_error - self.prev_error_vel) / self.CTRL_TIMESTEP
+                
+                target_acc = (
+                    self.kp_acc * vel_error +
+                    self.ki_acc * self.integral_error_vel +
+                    self.kd_acc * derivative_vel_error
+                )
+                
                 
 
                 #target_velocity = np.zeros(3)  # Assume target velocity to be zero for now
-                target_velocity = pid_output
-                target_acc = np.zeros(3)  # Assume target acceleration to be zero for now
+                #arget_velocity = pid_output
+                #target_acc = np.zeros(3)  # Assume target acceleration to be zero for now
                 target_yaw = 0.0
                 target_rpy = [0, 0, 0]
 

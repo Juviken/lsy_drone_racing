@@ -13,7 +13,7 @@ import csv
 class TrajGen:
     """Class for generating and optimizing 3D trajectories using cubic splines."""
 
-    def __init__(self, waypoints, obstacles, t2,initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50,alpha=0.7,use_initial=False):
+    def __init__(self, waypoints, obstacles, t2,initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,gate_margin=0.2, max_iterations=50,alpha=0.7,use_initial=False):
         self.waypoints = waypoints
         self.t2 = t2
         self.duration = duration
@@ -32,7 +32,7 @@ class TrajGen:
         self.gate_tree = self.create_obstacle_tree(obstacles[4:8])
         self.max_iterations = max_iterations
         self.alpha=alpha
-        self.gate_margin = 0.2
+        self.gate_margin = gate_margin
 
     
     def __str__(self):
@@ -193,8 +193,8 @@ def main():
     
     obstacle_height = 0.9
     obstacle_radius = 0.15
-    z_low = 0.525
-    z_high = 1.0
+    z_low = 0.525 +0.05
+    z_high = 1.0 +0.05
     gate_radius = 0.225
 
     gatepoints = np.array(give_gate())
@@ -230,9 +230,10 @@ def main():
     
     #Create gate obstacles
 
-    
+    #Load trajectory
+    initial_guess = np.loadtxt('trajectory/optimized_trajectory_test.csv', delimiter=',')
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=10, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=100,alpha=0.0,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2,initial_guess=initial_guess, duration=10, ctrl_freq=30, obstacle_margin=obstacle_radius*2,gate_margin=0.2, max_iterations=100,alpha=0.1,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
     run_optimization = True
     
@@ -244,10 +245,10 @@ def main():
         #plot final trajectorey
         traj_gen.plot_trajectory(traj_gen.intermediate_trajectories[f"Iteration{traj_gen.optimization_iterations}"])
         #Save final trajectory
-        traj_gen.save_trajectory('optimized_trajectory_test.csv')
+        traj_gen.save_trajectory('trajectory/optimized_trajectory_test.csv')
         
     else:
-        traj_gen.plot_from_csv('optimized_trajectory_test.csv')
+        traj_gen.plot_from_csv('trajectory/optimized_trajectory_test.csv')
 
 if __name__ == '__main__':
     main()
