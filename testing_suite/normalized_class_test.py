@@ -252,7 +252,7 @@ def main():
     #Load trajectory
     initial_guess = np.loadtxt('trajectory/optimized_trajectory_test.csv', delimiter=',')
 
-    traj_gen = TrajGen(waypoints, obstacles, t2,initial_guess=initial_guess, duration=7, ctrl_freq=30, obstacle_margin=0.4,gate_margin=0.2, max_iterations=50,alpha=0.0,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2,initial_guess=initial_guess, duration=10, ctrl_freq=30, obstacle_margin=0.4,gate_margin=0.2, max_iterations=50,alpha=0.0,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
     run_optimization = True
     

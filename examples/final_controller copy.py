@@ -12,7 +12,6 @@ from lsy_drone_racing.optimization_utils import TrajGen
 from lsy_drone_racing.planning_utils import Cylinder,gate_obstacle, waypoint_magic
 from scipy.spatial import cKDTree
 from matplotlib import pyplot as plt
-from lsy_drone_racing.PID import PIDController
 
 import math
 class Controller(BaseController):
@@ -65,13 +64,10 @@ class Controller(BaseController):
         # REPLACE THIS (START) ## 
         #########################
         
-        dt = 1.0 / self.CTRL_FREQ  # Time step
-        
-        #Define PID gains., args: kp, ki, kd, dt
-        self.pos_pid = PIDController(np.array([0.1, 0.1, 0.1]), np.array([0.0, 0.0, 0.0]), np.array([0.1, 0.1, 0.1]), dt)
-        self.vel_pid = PIDController(np.array([0.1, 0.1, 0.1]), np.array([0.0, 0.0, 0.0]), np.array([0.1, 0.1, 0.1]), dt)
-        self.yaw_pid = PIDController(0.1, 0.1, 0.1, dt)
-        
+        #Define PID gains
+        self.kp = np.array([0.1, 0.1, 0.1])  # Increased Proportional gains for x, y, z
+        self.ki = np.array([0.001, 0.001, 0.001])  # Increased Integral gains for x, y, z
+        self.kd = np.array([0.03, 0.03, 0.03])  # Increased Derivative gains for x, y, z
         
         #Initialize error terms
         self.integral_error = np.zeros(3)
@@ -79,9 +75,6 @@ class Controller(BaseController):
         
         #Initialize target velocity
         self.target_velocity = np.zeros(3)
-        self.target_acceleration = np.zeros(3)
-        self.target_yaw = 0.0
-        self.target_rpy_rates = np.zeros(3)
 
        
         gates = self.NOMINAL_GATES  #Get the nominal gate positions
@@ -160,7 +153,7 @@ class Controller(BaseController):
         
         else:
             print("Plotting from file...")
-            filename = "trajectory/success_7.csv"
+            filename = "trajectory/optimized_trajectory_test.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
@@ -201,27 +194,22 @@ class Controller(BaseController):
             step = iteration - 2 * self.CTRL_FREQ  # Account for 2s delay due to takeoff
             if ep_time - 2 > 0 and step < len(self.ref_x):
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
-                # Position control to compute desired velocity
-                pos_error = target_pos - drone_position
-                vel_command = self.pos_pid.compute(pos_error)
-                
-                # Velocity control to compute desired acceleration
-                vel_error = self.target_velocity - drone_velocity
-                acc_command = self.vel_pid.compute(vel_error) + self.target_acceleration
-                
-                
-                # Yaw control to compute desired yaw rate
-                yaw_error = self.target_yaw - drone_attitude[2]
-                yaw_rate_command = self.yaw_pid.compute(yaw_error)
-                yaw_rate_command = yaw_rate_command[0]
-                
-      
-                rpy_rates_command = np.zeros(3)
+                error = target_pos - drone_position
+                self.integral_error += error * self.CTRL_TIMESTEP
+                derivative_error = (error - self.prev_error) / self.CTRL_TIMESTEP
+                vel_der_error = (self.target_velocity - drone_velocity) 
+
+                # PID output
+                self.target_velocity = -self.kp * error  - self.kd * vel_der_error
+                self.prev_error = error
+
+                target_vel = self.target_velocity  # Assuming direct control of velocity
+                target_vel = np.zeros(3)
+                target_acc = np.zeros(3)    
+                target_yaw = 0.0             
+                target_rpy_rates = np.zeros(3)
                 command_type = Command.FULLSTATE
-                args =  [target_pos, vel_command, acc_command, yaw_rate_command, rpy_rates_command,ep_time]
-                print(args)
-                
-                #args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]
+                args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]
             elif step >= len(self.ref_x) and not self._setpoint_land:
                 command_type = Command.NOTIFYSETPOINTSTOP
                 args = []

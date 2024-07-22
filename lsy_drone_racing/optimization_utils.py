@@ -5,7 +5,7 @@ from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
-from lsy_drone_racing.geometry import create_cylinder
+
 
 class TrajGen:
     def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,obstacle_margin_gate=0.2, max_iterations=50, alpha=0.01, use_initial=False):
