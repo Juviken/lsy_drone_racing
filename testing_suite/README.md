@@ -1,8 +1,5 @@
 # Autonomous Drone Racing Project Course
 
-![ADR Banner](docs/img/banner.jpeg)
-<sub><sup>AI generated image</sup></sub>
-
 # Testing Suite for controller
 
 These are files that are used to test the overall trajectory planner used in the "final_controller".

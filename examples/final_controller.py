@@ -46,7 +46,7 @@ class Controller(BaseController):
         self.CTRL_TIMESTEP = initial_info["ctrl_timestep"]
         self.CTRL_FREQ = initial_info["ctrl_freq"]
         self.initial_obs = initial_obs
-        self.VERBOSE = verbose
+        self.VERBOSE = verbose  
         self.BUFFER_SIZE = buffer_size
 
         # Store a priori scenario information.
@@ -64,41 +64,38 @@ class Controller(BaseController):
         # REPLACE THIS (START) ## 
         #########################
         
-        # Improved PID parameters
+        #Define PID gains
         self.kp = np.array([0.1, 0.1, 0.1])  # Increased Proportional gains for x, y, z
         self.ki = np.array([0.001, 0.001, 0.001])  # Increased Integral gains for x, y, z
         self.kd = np.array([0.03, 0.03, 0.03])  # Increased Derivative gains for x, y, z
         
- 
-        
-
-
-        # Error accumulators
-        self.target_velocity = np.zeros(3)
+        #Initialize error terms
         self.integral_error = np.zeros(3)
         self.prev_error = np.zeros(3)
+        
+        #Initialize target velocity
+        self.target_velocity = np.zeros(3)
 
        
-        gates = self.NOMINAL_GATES
+        gates = self.NOMINAL_GATES  #Get the nominal gate positions
         
         waypoints = []
         
-        first = [self.initial_obs[0], self.initial_obs[2], 0.3] #Start position
-        second = [1,0,z_low]    
-        start = np.array([first])
+        start = np.array([[self.initial_obs[0], self.initial_obs[2], 0.3]]) #Add the starting position of the drone
 
+        
         gatepoints = []
         for i in range(len(gates)):
-            gatepoints.append([gates[i][0], gates[i][1], z_high if gates[i][-1] == 0 else z_low, gates[i][-2]]) #Add gate waypoints
+            gatepoints.append([gates[i][0], gates[i][1], z_high if gates[i][-1] == 0 else z_low, gates[i][-2]]) #Add gate waypoints to an array
         
-        #Use waypoint magic - args: gatepoints, buffer_distance
-        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)    #Add waypoints before and after gate to force straight passage
+        #Use waypoint magic - args: gatepoints, buffer_distance(distance before and after the gate)
+        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)   #Add waypoints before and after gate to ensure drone does not hit the edge of the gate, speeds up optimization
     
         #Add start to waypoints
         waypoints = np.concatenate((start,waypoints),axis=0)
         
         last_point = [initial_info["x_reference"][0],initial_info["x_reference"][2],initial_info["x_reference"][4]] #End position
-        waypoints = np.concatenate((waypoints,[last_point]),axis=0)
+        waypoints = np.concatenate((waypoints,[last_point]),axis=0) #Add end position to waypoints
         waypoints = np.array(waypoints)
     
         #Define obstacle dimensions
@@ -125,21 +122,21 @@ class Controller(BaseController):
         trajectory = interpolate.splev(t, tck)
         trajectory = np.array(trajectory).T
         
-        #Load trajectory from file - optional
+        #Load trajectory from file - optional, set use_initial=True in TrajGen to use this trajectory
         initial_traj = np.loadtxt("trajectory/success_10sec.csv", delimiter=',')
         
         #Create trajectory generator
         traj_gen = TrajGen(
             waypoints,                          # Waypoints
             obstacles,                          # Obstacles
-            t2,
-            initial_guess=trajectory,         # Trajectory for initial guess
+            t2,                                 # Time vector for each waypoint
+            initial_guess=trajectory,           #Trajectory for initial guess
             duration=duration,                  # Duration of the trajectory
-            ctrl_freq=30,
-            obstacle_margin=0.3,
-            obstacle_margin_gate=0.2, 
-            max_iterations=20,
-            alpha=0.01,
+            ctrl_freq=30,                       # Control frequency
+            obstacle_margin=0.3,                # Margin to obstacles
+            obstacle_margin_gate=0.2,           # Margin to gate frames
+            max_iterations=20,                  # Maximum iterations - Very few needed for acceptable results
+            alpha=0.01,                         #Cost function balance, default value is 0.01
             use_initial=False)
         print("Trajectory object created")
         

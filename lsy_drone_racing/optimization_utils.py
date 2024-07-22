@@ -8,7 +8,7 @@ from scipy.spatial import cKDTree
 from lsy_drone_racing.geometry import create_cylinder
 
 class TrajGen:
-    def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,obstacle_margin_gate=0.2, max_iterations=50, alpha=0.7, scaling_factor=1, use_initial=False):
+    def __init__(self, waypoints, obstacles, t2, initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,obstacle_margin_gate=0.2, max_iterations=50, alpha=0.01, use_initial=False):
         """
         Initialize the TrajGen class with waypoints, obstacles, and various parameters for trajectory generation and optimization.
 
@@ -34,7 +34,7 @@ class TrajGen:
         self.obstacle_margin_gate = obstacle_margin_gate
         self.max_iterations = max_iterations
         self.alpha = alpha
-        self.scaling_factor = scaling_factor
+
 
         self.initial_guess = initial_guess if use_initial and initial_guess is not None else self.generate_initial_guess() # Generate initial guess if not provided
         self.current_trajectory = self.initial_guess
