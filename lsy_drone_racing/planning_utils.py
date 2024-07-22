@@ -110,25 +110,20 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
         # Calculate direction vector for the buffer distance before and after the gate
         dx = buffer_distance * np.cos(yaw+np.pi/2)
         dy = buffer_distance * np.sin(yaw+np.pi/2)
-        #Print dx and dy
+
         
         #Calculations for placement of buffer vector
         #Height of next gatepoint
         z_next = waypoints[(i+1)%len(waypoints),2]
-        print(z_next)
         new_z = (z_next + z)/2
         
-   
         # Waypoint before the gate
         waypoint_after = [x + dx, y + dy, new_z]
         waypoint_before= [x - dx, y - dy, z]
     
-        
-
         # Original waypoint (at the gate)
         new_waypoints.append(waypoint_before)
     
-        
         new_waypoints.append([x, y, z])
         new_waypoints.append(waypoint_after)
         #new_waypoints.append([x, y, z])

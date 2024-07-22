@@ -1,20 +1,19 @@
-
 from __future__ import annotations  # Python 3.10 type hints
 
 import numpy as np
 from scipy import interpolate
+from scipy.spatial import cKDTree
+from matplotlib import pyplot as plt
+import math
 
 from lsy_drone_racing.command import Command
 from lsy_drone_racing.controller import BaseController
 from lsy_drone_racing.utils import draw_trajectory
-#from lsy_drone_racing.wrapper import DroneRacingObservationWrapper
 from lsy_drone_racing.optimization_utils import TrajGen
-from lsy_drone_racing.planning_utils import Cylinder,gate_obstacle, waypoint_magic
-from scipy.spatial import cKDTree
-from matplotlib import pyplot as plt
+from lsy_drone_racing.planning_utils import Cylinder, gate_obstacle, waypoint_magic
 from lsy_drone_racing.PID import PIDController
 
-import math
+
 class Controller(BaseController):
     """Template controller class."""
 
@@ -25,159 +24,114 @@ class Controller(BaseController):
         buffer_size: int = 100,
         verbose: bool = True,
     ):
-        """Initialization of the controller.
-
-        INSTRUCTIONS:
-            The controller's constructor has access the initial state `initial_obs` and the a priori
-            infromation contained in dictionary `initial_info`.
-            Use this method to initialize
-            constants, counters, pre-plan trajectories, etc.
-
-        Args:
-            initial_obs: The initial observation of the environment's state. Consists of
-                [drone_xyz_yaw, gates_xyz_yaw, gates_in_range, obstacles_xyz, obstacles_in_range,
-                gate_id]
-            initial_info: The a priori information as a dictionary with keys 'symbolic_model',
-                'nominal_physical_parameters', 'nominal_gates_pos_and_type', etc.
-            buffer_size: Size of the data buffers used in method `learn()`.
-            verbose: Turn on and off additional printouts and plots.
-        """
+        """Initialization of the controller."""
         super().__init__(initial_obs, initial_info, buffer_size, verbose)
-        # Save environment and control parameters.
+        
         self.CTRL_TIMESTEP = initial_info["ctrl_timestep"]
         self.CTRL_FREQ = initial_info["ctrl_freq"]
         self.initial_obs = initial_obs
         self.VERBOSE = verbose  
         self.BUFFER_SIZE = buffer_size
 
-        # Store a priori scenario information.
         self.NOMINAL_GATES = initial_info["nominal_gates_pos_and_type"]
         self.NOMINAL_OBSTACLES = initial_info["nominal_obstacles_pos"]
                 
         z_low = initial_info["gate_dimensions"]["low"]["height"]
         z_high = initial_info["gate_dimensions"]["tall"]["height"]
 
-        # Reset counters and buffers.
         self.reset()
         self.episode_reset()
-
-        #########################
-        # REPLACE THIS (START) ## 
-        #########################
         
-        dt = 1.0 / self.CTRL_FREQ  # Time step
+        # Define PID controllers
+        self.initialize_pid_controllers()
         
-        #Define PID gains., args: kp, ki, kd, dt
-        self.pos_pid = PIDController(np.array([0.1, 0.1, 0.1]), np.array([0.0, 0.0, 0.0]), np.array([0.1, 0.1, 0.1]), dt)
-        self.vel_pid = PIDController(np.array([0.1, 0.1, 0.1]), np.array([0.0, 0.0, 0.0]), np.array([0.1, 0.1, 0.1]), dt)
-        self.yaw_pid = PIDController(0.1, 0.1, 0.1, dt)
+        self.target_yaw = np.pi/8  # Target yaw angle
         
+        # Generate and optimize trajectory
+        self.waypoints, self.ref_x, self.ref_y, self.ref_z = self.generate_trajectory(initial_info, z_high, z_low)
         
-        #Initialize error terms
-        self.integral_error = np.zeros(3)
-        self.prev_error = np.zeros(3)
-        
-        #Initialize target velocity
-        self.target_velocity = np.zeros(3)
-        self.target_acceleration = np.zeros(3)
-        self.target_yaw = 0.0
-        self.target_rpy_rates = np.zeros(3)
-
-       
-        gates = self.NOMINAL_GATES  #Get the nominal gate positions
-        
-        waypoints = []
-        
-        start = np.array([[self.initial_obs[0], self.initial_obs[2], 0.3]]) #Add the starting position of the drone
-
-        
-        gatepoints = []
-        for i in range(len(gates)):
-            gatepoints.append([gates[i][0], gates[i][1], z_high if gates[i][-1] == 0 else z_low, gates[i][-2]]) #Add gate waypoints to an array
-        
-        #Use waypoint magic - args: gatepoints, buffer_distance(distance before and after the gate)
-        waypoints = waypoint_magic(np.array(gatepoints),buffer_distance=0.35)   #Add waypoints before and after gate to ensure drone does not hit the edge of the gate, speeds up optimization
-    
-        #Add start to waypoints
-        waypoints = np.concatenate((start,waypoints),axis=0)
-        
-        last_point = [initial_info["x_reference"][0],initial_info["x_reference"][2],initial_info["x_reference"][4]] #End position
-        waypoints = np.concatenate((waypoints,[last_point]),axis=0) #Add end position to waypoints
-        waypoints = np.array(waypoints)
-    
-        #Define obstacle dimensions
-        obstacle_height = 0.9
-        obstacle_radius = 0.15
-
-        obstacles = []
-        
-        #Create obstacle models, args: radius, height, position
-        for i in range(len(self.NOMINAL_OBSTACLES)):
-            obstacles.append(Cylinder(obstacle_radius, obstacle_height, self.NOMINAL_OBSTACLES[i][0:3]))
-        
-        #Create gate obstacles
-        for i in range(len(gates)):
-            obstacles.append(gate_obstacle(gates[i],z_high if gates[i][-1] == 0 else z_low))
-        
-        
-        t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
-        duration = 10  #Duration of the trajectory
-        
-        #Create an initial trajectory - optional
-        t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
-        tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
-        trajectory = interpolate.splev(t, tck)
-        trajectory = np.array(trajectory).T
-        
-        #Load trajectory from file - optional, set use_initial=True in TrajGen to use this trajectory
-        initial_traj = np.loadtxt("trajectory/success_10sec.csv", delimiter=',')
-        
-        #Create trajectory generator
-        traj_gen = TrajGen(
-            waypoints,                          # Waypoints
-            obstacles,                          # Obstacles
-            t2,                                 # Time vector for each waypoint
-            initial_guess=trajectory,           #Trajectory for initial guess
-            duration=duration,                  # Duration of the trajectory
-            ctrl_freq=30,                       # Control frequency
-            obstacle_margin=0.3,                # Margin to obstacles
-            obstacle_margin_gate=0.2,           # Margin to gate frames
-            max_iterations=20,                  # Maximum iterations - Very few needed for acceptable results
-            alpha=0.01,                         #Cost function balance, default value is 0.01
-            use_initial=False)
-        print("Trajectory object created")
-        
-        self.run_opt = False
-        
-        if self.run_opt:
-            optimized_trajectory = traj_gen.optimize_trajectory() #Optimize the trajectory
-            print("Optimized trajectory")
-            
-            traj_gen.save_trajectory('trajectory/optimized_trajectory.csv')
-            print("Trajectory saved")
-            current_traj = traj_gen.give_current()
-            self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
-        
-        else:
-            print("Plotting from file...")
-            filename = "trajectory/success_7.csv"
-            optimized_trajectory = np.loadtxt(filename, delimiter=',')
-            current_traj = optimized_trajectory
-            self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
-           
-        self.waypoints = waypoints
-
-        
-        assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
-
         if self.VERBOSE:
-            # Draw the trajectory on PyBullet's GUI.
             draw_trajectory(initial_info, self.waypoints, self.ref_x, self.ref_y, self.ref_z)
 
         self._take_off = False
         self._setpoint_land = False
         self._land = False
 
+    def initialize_pid_controllers(self):
+        """Initialize the PID controllers."""
+        dt = 1.0 / self.CTRL_FREQ  # Time step
+        
+        # Define PID gains for position to attitude conversion
+        self.kp_pos = 0.3
+        self.ki_pos = 0.001
+        self.kd_pos = 0.01
+        
+        self.pos_pid = PIDController(np.array([self.kp_pos]), np.array([self.ki_pos]*3), np.array([self.kd_pos]*3), dt)
+        
+        # Define PID gains for attitude control
+        self.kp_att = 0.1
+        self.kd_att = 0.05
+        self.att_pid = PIDController(np.array([self.kp_att]*3), np.array([0.0]*3), np.array([self.kd_att]*3), dt)
+
+    def generate_trajectory(self, initial_info, z_high, z_low):
+        """Generate the trajectory for the drone."""
+        gates = self.NOMINAL_GATES
+        
+        start = np.array([[self.initial_obs[0], self.initial_obs[2], 0.3]])  # Add the starting position of the drone
+        
+        gatepoints = [[g[0], g[1], z_high if g[-1] == 0 else z_low, g[-2]] for g in gates]
+        
+        waypoints = waypoint_magic(np.array(gatepoints), buffer_distance=0.35)
+        waypoints = np.concatenate((start, waypoints), axis=0)
+        
+        last_point = [initial_info["x_reference"][0], initial_info["x_reference"][2], initial_info["x_reference"][4]]
+        waypoints = np.concatenate((waypoints, [last_point]), axis=0)
+        waypoints = np.array(waypoints)
+    
+        obstacle_height = 0.9
+        obstacle_radius = 0.15
+
+        obstacles = [Cylinder(obstacle_radius, obstacle_height, pos[:3]) for pos in self.NOMINAL_OBSTACLES]
+        obstacles.extend([gate_obstacle(g, z_high if g[-1] == 0 else z_low) for g in gates])
+        
+        t2 = np.linspace(0, 1, waypoints.shape[0])
+        duration = 10
+        
+        t = np.linspace(0, 1, int(duration * self.CTRL_FREQ))
+        tck, u = interpolate.splprep([waypoints[:, 0], waypoints[:, 1], waypoints[:, 2]], s=0.1)
+        trajectory = np.array(interpolate.splev(t, tck)).T
+        
+        initial_traj = np.loadtxt("trajectory/success_10sec.csv", delimiter=',')
+        
+        traj_gen = TrajGen(
+            waypoints,
+            obstacles,
+            t2,
+            initial_guess=trajectory,
+            duration=duration,
+            ctrl_freq=30,
+            obstacle_margin=0.3,
+            obstacle_margin_gate=0.2,
+            max_iterations=20,
+            alpha=0.01,
+            use_initial=False
+        )
+        
+        self.run_opt = False
+        
+        if self.run_opt:
+            optimized_trajectory = traj_gen.optimize_trajectory()
+            traj_gen.save_trajectory('trajectory/optimized_trajectory.csv')
+            current_traj = traj_gen.give_current()
+        else:
+            filename = "trajectory/success_10sec.csv"
+            optimized_trajectory = np.loadtxt(filename, delimiter=',')
+            current_traj = optimized_trajectory
+        
+        ref_x, ref_y, ref_z = current_traj[:, 0], current_traj[:, 1], current_traj[:, 2]
+        assert max(ref_z) < 2.5, "Drone must stay below the ceiling"
+        
+        return waypoints, ref_x, ref_y, ref_z
 
     def compute_control(
         self,
@@ -188,10 +142,9 @@ class Controller(BaseController):
         info: dict | None = None,
     ) -> tuple[Command, list]:
         iteration = int(ep_time * self.CTRL_FREQ)
-        drone_position = obs[0:3]  # x, y, z position
-        drone_velocity = obs[3:6]  # x, y, z acceleration
-        drone_attitude = obs[6:9]  # phi (roll), theta (pitch), psi (yaw)
-        #print("Viktigt",info.keys())
+        drone_position = obs[0:3]
+        drone_velocity = obs[3:6]
+        drone_attitude = obs[6:9]
 
         if not self._take_off:
             command_type = Command.TAKEOFF
@@ -201,27 +154,24 @@ class Controller(BaseController):
             step = iteration - 2 * self.CTRL_FREQ  # Account for 2s delay due to takeoff
             if ep_time - 2 > 0 and step < len(self.ref_x):
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
-                # Position control to compute desired velocity
+                
+                # Compute position error
                 pos_error = target_pos - drone_position
-                vel_command = self.pos_pid.compute(pos_error)
                 
-                # Velocity control to compute desired acceleration
-                vel_error = self.target_velocity - drone_velocity
-                acc_command = self.vel_pid.compute(vel_error) + self.target_acceleration
+                # Compute desired roll and pitch from position error
+                desired_att = self.pos_pid.compute(pos_error)
+                desired_roll = desired_att[1]  # Assuming roll is affected by y-error
+                desired_pitch = desired_att[0]  # Assuming pitch is affected by x-error
+                desired_yaw = self.target_yaw  # Assuming we want to keep yaw constant
+
+                # Compute attitude error
+                att_error = np.array([desired_roll, desired_pitch, desired_yaw]) - drone_attitude
                 
+                # Compute desired roll, pitch, and yaw rates
+                rpy_rate_command = self.att_pid.compute(att_error)
                 
-                # Yaw control to compute desired yaw rate
-                yaw_error = self.target_yaw - drone_attitude[2]
-                yaw_rate_command = self.yaw_pid.compute(yaw_error)
-                yaw_rate_command = yaw_rate_command[0]
-                
-      
-                rpy_rates_command = np.zeros(3)
                 command_type = Command.FULLSTATE
-                args =  [target_pos, vel_command, acc_command, yaw_rate_command, rpy_rates_command,ep_time]
-                print(args)
-                
-                #args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]
+                args = [target_pos, np.zeros(3), np.zeros(3), rpy_rate_command[2], rpy_rate_command, ep_time]
             elif step >= len(self.ref_x) and not self._setpoint_land:
                 command_type = Command.NOTIFYSETPOINTSTOP
                 args = []
@@ -252,4 +202,3 @@ class Controller(BaseController):
         _ = self.reward_buffer
         _ = self.done_buffer
         _ = self.info_buffer
-

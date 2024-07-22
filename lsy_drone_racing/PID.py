@@ -1,7 +1,8 @@
 import numpy as np
 
 class PIDController:
-    def __init__(self, kp, ki, kd, dt):
+    #Basic PID controller with the ability to reset the integral and compute the output
+    def __init__(self, kp, ki, kd, dt): #Takes the proportional, integral, derivative gains and the time step
         self.kp = kp
         self.ki = ki
         self.kd = kd

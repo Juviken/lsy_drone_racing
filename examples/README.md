@@ -4,7 +4,7 @@
 
 The controller does not have any requirements that are not covered by the parent installation guide.
 
-The additional python files/modules needed to run this controller are located in lsy_drone_racing and are "optimization_utils.py" and "planning_utils.py"
+The additional python files/modules needed to run this controller are located in lsy_drone_racing and are "optimization_utils.py", "planning_utils.py" and "PID.py"
 
 # Usage
 
