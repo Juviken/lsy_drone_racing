@@ -35,7 +35,7 @@ class gate_obstacle:
         self.y = waypoint[1]
         self.z = waypoint[2]
         self.yaw = waypoint[5]
-        self.radius = radius
+        self.radius = radius-0.1
         self.obstacle_points = self.gate_points()
         
     def gate_points(self):
@@ -44,13 +44,29 @@ class gate_obstacle:
         bottom = np.array([self.x, self.y, self.z - self.radius])
         dx = self.radius * np.cos(self.yaw)
         dy = self.radius * np.sin(self.yaw)
-        left = np.array([self.x - dx, self.y - dy, self.z])
-        right = np.array([self.x + dx, self.y + dy, self.z])
+        
+        #Corners of the gate
         top_left = np.array([self.x - dx, self.y - dy, self.z + self.radius])
         top_right = np.array([self.x + dx, self.y + dy, self.z + self.radius])
         bottom_left = np.array([self.x - dx, self.y - dy, self.z - self.radius])
         bottom_right = np.array([self.x + dx, self.y + dy, self.z - self.radius])
-        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right])
+        
+        #Generate 5 points in-between each of the corners
+        #Top row
+        top_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z + self.radius])
+        bottom_left_inter = np.array([self.x - dx/2, self.y - dy/2, self.z - self.radius])
+        top_right_inter = np.array([self.x + dx/2, self.y + dy/2, self.z + self.radius])
+        bottom_right_inter = np.array([self.x + dx/2, self.y + dy/2, self.z - self.radius])
+        left_top_inter = np.array([self.x - dx, self.y - dy, self.z + self.radius/2])
+        left_bottom_inter = np.array([self.x - dx, self.y - dy, self.z - self.radius/2])
+        right_top_inter = np.array([self.x + dx, self.y + dy, self.z + self.radius/2])
+        right_bottom_inter = np.array([self.x + dx, self.y + dy, self.z - self.radius/2])
+        
+        
+        
+        left = np.array([self.x - dx, self.y - dy, self.z])
+        right = np.array([self.x + dx, self.y + dy, self.z])
+        return np.array([top,bottom,left,right,top_left,top_right,bottom_left,bottom_right,top_left_inter,bottom_left_inter,top_right_inter,bottom_right_inter,left_top_inter,left_bottom_inter, right_top_inter,right_bottom_inter])
 
 def plot_stuff  (obstacles,waypoints):
     #Plot the obstacles and waypoints in 3D in an environment x,y,z where x = [-3, 3], y = [-3, 3], z = [0,2]
@@ -95,9 +111,16 @@ def waypoint_magic(waypoints: np.ndarray, buffer_distance: float = 0.25) -> np.n
         dx = buffer_distance * np.cos(yaw+np.pi/2)
         dy = buffer_distance * np.sin(yaw+np.pi/2)
         #Print dx and dy
+        
+        #Calculations for placement of buffer vector
+        #Height of next gatepoint
+        z_next = waypoints[(i+1)%len(waypoints),2]
+        print(z_next)
+        new_z = (z_next + z)/2
+        
    
         # Waypoint before the gate
-        waypoint_after = [x + dx, y + dy, z]
+        waypoint_after = [x + dx, y + dy, new_z]
         waypoint_before= [x - dx, y - dy, z]
     
         

@@ -42,7 +42,7 @@ class TrajGen:
         self.optimization_iterations = 0
         self.obstacles = obstacles
         self.obstacle_tree = self.create_obstacle_tree(obstacles[0:4])  # Create KD-tree for obstacles
-        self.obstacle_tree2 = self.create_obstacle_tree(obstacles[4:8]) # Create KD-tree for gates
+        self.gate_tree = self.create_obstacle_tree(obstacles[4:8]) # Create KD-tree for gates
 
         
 
@@ -161,6 +161,7 @@ class TrajGen:
         smoothness = np.sum(np.diff(traj, n=2, axis=0) ** 2) #L2 norm of second derivative
         return self.alpha * total_distance + (1 - self.alpha) * smoothness
     
+
     def smoothness_objective(self, traj):
         """Calculate smoothness cost of trajectory."""
         traj = traj.reshape(-1, 3) #Reshape trajectory
@@ -172,15 +173,17 @@ class TrajGen:
         def constraint(traj):
             traj = traj.reshape(-1, 3)
             distances, _ = self.obstacle_tree.query(traj)
-            return np.min(distances - self.obstacle_margin)
+            return np.min(distances) - self.obstacle_margin #For faster optimization
+            #return distances - self.obstacle_margin
         return {'type': 'ineq', 'fun': constraint}
     
     def gate_inequality(self):
         
         def constraint(traj):
             traj = traj.reshape(-1, 3)
-            distances, _ = self.obstacle_tree2.query(traj)
-            return np.min(distances - self.obstacle_margin_gate)
+            distances, _ = self.gate_tree.query(traj)
+            return np.min(distances) - self.obstacle_margin_gate #For faster optimization
+            #return distances - self.obstacle_margin_gate
         
         return {'type': 'ineq', 'fun': constraint}
 

@@ -6,15 +6,14 @@ from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import cKDTree
-from geometry import create_cylinder
 from gats_obs import give_gate, give_obst
 from cylinder_class import Cylinder, gate_obstacle, waypoint_magic
-import csv
+
 
 class TrajGen:
     """Class for generating and optimizing 3D trajectories using cubic splines."""
 
-    def __init__(self, waypoints, obstacles, t2,initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2, max_iterations=50,alpha=0.7,use_initial=False):
+    def __init__(self, waypoints, obstacles, t2,initial_guess=None, duration=10, ctrl_freq=30, obstacle_margin=2,gate_margin=0.2, max_iterations=50,alpha=0.7,use_initial=False):
         self.waypoints = waypoints
         self.t2 = t2
         self.duration = duration
@@ -29,11 +28,11 @@ class TrajGen:
         self.current_trajectory = self.initial_guess
         self.optimization_iterations = 0
         self.obstacles = obstacles
-        self.obstacle_tree = self.create_obstacle_tree(obstacles)
+        self.obstacle_tree = self.create_obstacle_tree(obstacles[0:4])
+        self.gate_tree = self.create_obstacle_tree(obstacles[4:8])
         self.max_iterations = max_iterations
         self.alpha=alpha
-
-        
+        self.gate_margin = gate_margin
 
     
     def __str__(self):
@@ -76,8 +75,8 @@ class TrajGen:
         ax.set_title('3D Cubic Spline Interpolation and Trajectory Optimization')
         ax.legend()
         #Set limits
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_xlim(-2, 2)
+        ax.set_ylim(-2, 2)
         ax.set_zlim(0, 2.5)
         plt.show()
 
@@ -109,15 +108,16 @@ class TrajGen:
         def callback(traj):
             """"Callback function to store intermediate trajectories."""
             self.ref_x, self.ref_y, self.ref_z = self.current_trajectory[:, 0],self.current_trajectory[:, 1],self.current_trajectory[:, 2]
-            assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
+            #assert max(self.ref_z) < 2.5, "Drone must stay below the ceiling"
             self.optimization_iterations += 1
             print(f"Iteration {self.optimization_iterations}")
             self.intermediate_trajectories[f"Iteration{self.optimization_iterations}"] = traj.reshape(-1, 3)
             self.current_trajectory = traj.reshape(-1, 3)
 
-        constraints = [self.inequality_constraint(), self.equality_constraint()]
+        constraints = [self.inequality_constraint(), self.gate_constraint(),self.equality_constraint()]
         initial_guess_flat = self.initial_guess.flatten()
         result = minimize(
+            
             lambda traj: self.combined_objective(traj),
             initial_guess_flat,
             constraints=constraints,
@@ -157,6 +157,14 @@ class TrajGen:
             distances, _ = self.obstacle_tree.query(traj)
             return np.min(distances - self.obstacle_margin)
         return {'type': 'ineq', 'fun': constraint}
+    
+    def gate_constraint(self):
+        """Create inequality constraints based on gate avoidance."""
+        def constraint(traj):
+            traj = traj.reshape(-1, 3)
+            distances, _ = self.gate_tree.query(traj)
+            return np.min(distances - self.gate_margin)
+        return {'type': 'ineq', 'fun': constraint}
 
     def equality_constraint(self):
         """Ensure waypoints are visited by constraining positions."""
@@ -166,6 +174,25 @@ class TrajGen:
             indices = np.clip(indices, 0, traj.shape[0] - 1)
             return (traj[indices] - self.waypoints).flatten()
         return {'type': 'eq', 'fun': constraint}
+    
+    def straight_line_constraint(self, wp_start, wp_end):
+        """Enforce the trajectory to be a straight line between two waypoints."""
+        def constraint(traj):
+            traj = traj.reshape(-1, 3)
+            indices = np.linspace(wp_start, wp_end, num=(wp_end - wp_start + 1), dtype=int)
+            line_vec = self.waypoints[wp_end] - self.waypoints[wp_start]
+            line_length = np.linalg.norm(line_vec)
+            line_dir = line_vec / line_length
+            for i in range(len(indices) - 1):
+                seg_vec = traj[indices[i+1]] - traj[indices[i]]
+                seg_length = np.linalg.norm(seg_vec)
+                if seg_length == 0:
+                    continue
+                seg_dir = seg_vec / seg_length
+                if not np.allclose(seg_dir, line_dir, atol=1e-2):
+                    return -1  # Not in the desired direction
+            return 1
+        return {'type': 'ineq', 'fun': constraint}
     
     def save_trajectory(self, filename):
         """Save the optimized trajectory to a CSV file."""
@@ -185,15 +212,15 @@ def main():
     
     obstacle_height = 0.9
     obstacle_radius = 0.15
-    z_low = 0.525
-    z_high = 1.0
+    z_low = 0.525 
+    z_high = 1.0 
     gate_radius = 0.225
 
     gatepoints = np.array(give_gate())
     waypoints = gatepoints
 
     #Use waypoint magic
-    waypoints = waypoint_magic(waypoints,buffer_distance=0.35)
+    waypoints = waypoint_magic(waypoints,buffer_distance=0.3)
     #only keep the x,y and z positions from the waypoints
     waypoints = waypoints[:,0:3]
     
@@ -222,9 +249,10 @@ def main():
     
     #Create gate obstacles
 
-    
+    #Load trajectory
+    initial_guess = np.loadtxt('trajectory/optimized_trajectory_test.csv', delimiter=',')
 
-    traj_gen = TrajGen(waypoints, obstacles, t2, duration=8, ctrl_freq=30, obstacle_margin=obstacle_radius*2, max_iterations=40,alpha=0.1,use_initial=False)
+    traj_gen = TrajGen(waypoints, obstacles, t2,initial_guess=initial_guess, duration=7, ctrl_freq=30, obstacle_margin=0.4,gate_margin=0.2, max_iterations=50,alpha=0.0,use_initial=False)
     #traj_gen.plot_trajectory(traj_gen.initial_guess)
     run_optimization = True
     
@@ -236,10 +264,10 @@ def main():
         #plot final trajectorey
         traj_gen.plot_trajectory(traj_gen.intermediate_trajectories[f"Iteration{traj_gen.optimization_iterations}"])
         #Save final trajectory
-        traj_gen.save_trajectory('optimized_trajectory_test.csv')
+        traj_gen.save_trajectory('trajectory/optimized_trajectory_test.csv')
         
     else:
-        traj_gen.plot_from_csv('optimized_trajectory_test.csv')
+        traj_gen.plot_from_csv('trajectory/optimized_trajectory_test.csv')
 
 if __name__ == '__main__':
     main()

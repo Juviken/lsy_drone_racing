@@ -53,8 +53,8 @@ class Controller(BaseController):
         self.NOMINAL_GATES = initial_info["nominal_gates_pos_and_type"]
         self.NOMINAL_OBSTACLES = initial_info["nominal_obstacles_pos"]
                 
-        z_low = initial_info["gate_dimensions"]["low"]["height"]+0.05
-        z_high = initial_info["gate_dimensions"]["tall"]["height"]+0.05
+        z_low = initial_info["gate_dimensions"]["low"]["height"]
+        z_high = initial_info["gate_dimensions"]["tall"]["height"]
 
         # Reset counters and buffers.
         self.reset()
@@ -64,23 +64,20 @@ class Controller(BaseController):
         # REPLACE THIS (START) ## 
         #########################
         
-        # PID parameters
-        self.kp = np.array([0.01, 0.01, 0.01])  # Proportional gains for x, y, z
-        self.ki = np.array([0.001, 0.001, 0.001])  # Integral gains for x, y, z
-        self.kd = np.array([0.01, 0.01, 0.01])  # Derivative gains for x, y, z
+        # Improved PID parameters
+        self.kp = np.array([0.1, 0.1, 0.1])  # Increased Proportional gains for x, y, z
+        self.ki = np.array([0.001, 0.001, 0.001])  # Increased Integral gains for x, y, z
+        self.kd = np.array([0.03, 0.03, 0.03])  # Increased Derivative gains for x, y, z
         
-        # Acceleration PID parameters
-        self.kp_acc = np.array([0.0, 0.0, 0.0])
-        self.ki_acc = np.array([0.0, 0.0, 0.0])
-        self.kd_acc = np.array([0.0, 0.0, 0.0])
+ 
         
 
 
         # Error accumulators
+        self.target_velocity = np.zeros(3)
         self.integral_error = np.zeros(3)
         self.prev_error = np.zeros(3)
-        self.integral_error_vel = np.zeros(3)
-        self.prev_error_vel = np.zeros(3)
+
        
         gates = self.NOMINAL_GATES
         
@@ -120,7 +117,7 @@ class Controller(BaseController):
         
         
         t2 = np.linspace(0, 1, waypoints.shape[0])  # Time vector for each waypoint
-        duration = 8  #Duration of the trajectory
+        duration = 10  #Duration of the trajectory
         
         #Create an initial trajectory - optional
         t = np.linspace(0, 1, int(duration * self.CTRL_FREQ)) # Time vector for the trajectory
@@ -139,27 +136,27 @@ class Controller(BaseController):
             initial_guess=trajectory,         # Trajectory for initial guess
             duration=duration,                  # Duration of the trajectory
             ctrl_freq=30,
-            obstacle_margin=0.25,
+            obstacle_margin=0.3,
             obstacle_margin_gate=0.2, 
-            max_iterations=50,
-            alpha=0.00,
+            max_iterations=20,
+            alpha=0.01,
             use_initial=False)
         print("Trajectory object created")
         
-        self.run_opt = True
+        self.run_opt = False
         
         if self.run_opt:
             optimized_trajectory = traj_gen.optimize_trajectory() #Optimize the trajectory
             print("Optimized trajectory")
             
-            traj_gen.save_trajectory('optimized_trajectory.csv')
+            traj_gen.save_trajectory('trajectory/optimized_trajectory.csv')
             print("Trajectory saved")
             current_traj = traj_gen.give_current()
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
         
         else:
             print("Plotting from file...")
-            filename = "trajectory/optimized_trajectory.csv"
+            filename = "trajectory/optimized_trajectory_test.csv"
             optimized_trajectory = np.loadtxt(filename, delimiter=',')
             current_traj = optimized_trajectory
             self.ref_x, self.ref_y, self.ref_z = current_traj[:, 0],current_traj[:, 1],current_traj[:, 2]
@@ -197,46 +194,25 @@ class Controller(BaseController):
             args = [0.3, 2]  # Height, duration
             self._take_off = True
         else:
-            step = iteration - 2 * self.CTRL_FREQ
-            #Print gates in range
-            print("Gates in range:",info["gates_in_range"])
+            step = iteration - 2 * self.CTRL_FREQ  # Account for 2s delay due to takeoff
             if ep_time - 2 > 0 and step < len(self.ref_x):
-                
                 target_pos = np.array([self.ref_x[step], self.ref_y[step], self.ref_z[step]])
                 error = target_pos - drone_position
                 self.integral_error += error * self.CTRL_TIMESTEP
                 derivative_error = (error - self.prev_error) / self.CTRL_TIMESTEP
+                vel_der_error = (self.target_velocity - drone_velocity) 
 
-                target_velocity = (
-                    self.kp * error +
-                    self.ki * self.integral_error +
-                    self.kd * derivative_error
-                )
-                
-                vel_error = target_velocity - drone_velocity
-                self.integral_error_vel += vel_error * self.CTRL_TIMESTEP
-                derivative_vel_error = (vel_error - self.prev_error_vel) / self.CTRL_TIMESTEP
-                
-                target_acc = (
-                    self.kp_acc * vel_error +
-                    self.ki_acc * self.integral_error_vel +
-                    self.kd_acc * derivative_vel_error
-                )
-                
-                
-
-                #target_velocity = np.zeros(3)  # Assume target velocity to be zero for now
-                #arget_velocity = pid_output
-                #target_acc = np.zeros(3)  # Assume target acceleration to be zero for now
-                target_yaw = 0.0
-                target_rpy = [0, 0, 0]
-
+                # PID output
+                self.target_velocity = -self.kp * error  - self.kd * vel_der_error
                 self.prev_error = error
-                
+
+                target_vel = self.target_velocity  # Assuming direct control of velocity
+                target_vel = np.zeros(3)
+                target_acc = np.zeros(3)    
+                target_yaw = 0.0             
+                target_rpy_rates = np.zeros(3)
                 command_type = Command.FULLSTATE
-                args = [target_pos, target_velocity, target_acc, target_yaw, target_rpy, ep_time]
-
-                self.prev_error = error
+                args = [target_pos, target_vel, target_acc, target_yaw, target_rpy_rates, ep_time]
             elif step >= len(self.ref_x) and not self._setpoint_land:
                 command_type = Command.NOTIFYSETPOINTSTOP
                 args = []

@@ -1,12 +1,14 @@
 # Autonomous Drone Racing Project Course
+
 ![ADR Banner](docs/img/banner.jpeg)
 <sub><sup>AI generated image</sup></sub>
 
 ## Table of Contents
+
 - [Autonomous Drone Racing Project Course](#autonomous-drone-racing-project-course)
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
-    - [Fork lsy\_drone\_racing](#fork-lsy_drone_racing)
+    - [Fork lsy_drone_racing](#fork-lsy_drone_racing)
     - [Using conda/mamba](#using-condamamba)
   - [Difficulty levels](#difficulty-levels)
     - [Switching between configurations](#switching-between-configurations)
@@ -23,10 +25,10 @@
       - [Settings](#settings)
       - [Launch](#launch)
 
-
 ## Installation
 
 To run the LSY Autonomous Drone Racing project, you will need 3 main repositories:
+
 - [safe-control-gym](https://github.com/utiasDSL/safe-control-gym/tree/beta-iros-competition) - `beta-iros-competition` branch: The drone simulator and gym environments
 - [pycffirmware](https://github.com/utiasDSL/pycffirmware) - `main` branch: A simulator for the on-board controller response of the drones we are using to accurately model their behavior
 - [lsy_drone_racing](https://github.com/utiasDSL/lsy_drone_racing) - `main` branch: This repository contains the scripts to simulate and deploy the drones in the racing challenge
@@ -62,9 +64,11 @@ pip install .
 ```
 
 > **Note:** If you receive an error installing safe-control-gym related to gym==0.21.0, run
+>
 > ```bash
 >    pip install setuptools==65.5.0 pip==21 wheel==0.38.4
 > ```
+>
 > first
 
 ```bash
@@ -86,7 +90,7 @@ pip install --upgrade pip
 pip install -e .
 ```
 
-Finally, you can test if the installation was successful by running 
+Finally, you can test if the installation was successful by running
 
 ```bash
 cd ~/repos/lsy_drone_racing
@@ -96,22 +100,24 @@ python scripts/sim.py
 If everything is installed correctly, this opens the simulator and simulates a drone flying through four gates.
 
 ## Difficulty levels
+
 The complete problem is specified by a YAML file, e.g. [`getting_started.yaml`](config/getting_started.yaml)
 
 The config folder contains settings for progressively harder scenarios:
 
 |         Evaluation Scenario         | Constraints | Rand. Inertial Properties | Randomized Obstacles, Gates | Rand. Between Episodes |         Notes         |
 | :---------------------------------: | :---------: | :-----------------------: | :-------------------------: | :--------------------: | :-------------------: |
-| [`level0.yaml`](config/level0.yaml) |   **Yes**   |           *No*            |            *No*             |          *No*          |   Perfect knowledge   |
-| [`level1.yaml`](config/level1.yaml) |   **Yes**   |          **Yes**          |            *No*             |          *No*          |       Adaptive        |
-| [`level2.yaml`](config/level2.yaml) |   **Yes**   |          **Yes**          |           **Yes**           |          *No*          | Learning, re-planning |
+| [`level0.yaml`](config/level0.yaml) |   **Yes**   |           _No_            |            _No_             |          _No_          |   Perfect knowledge   |
+| [`level1.yaml`](config/level1.yaml) |   **Yes**   |          **Yes**          |            _No_             |          _No_          |       Adaptive        |
+| [`level2.yaml`](config/level2.yaml) |   **Yes**   |          **Yes**          |           **Yes**           |          _No_          | Learning, re-planning |
 | [`level3.yaml`](config/level3.yaml) |   **Yes**   |          **Yes**          |           **Yes**           |        **Yes**         |      Robustness       |
 |                                     |             |                           |                             |                        |                       |
-|              sim2real               |   **Yes**   |    Real-life hardware     |           **Yes**           |          *No*          |   Sim2real transfer   |
+|              sim2real               |   **Yes**   |    Real-life hardware     |           **Yes**           |          _No_          |   Sim2real transfer   |
 
 > **Note:** "Rand. Between Episodes" (governed by argument `reseed_on_reset`) states whether randomized properties and positions vary or are kept constant (by re-seeding the random number generator on each `env.reset()`) across episodes
 
 ### Switching between configurations
+
 You can choose which configuration to use by changing the `--config` command line option. To e.g. run the example controller on the hardest scenario, you can use the following command
 
 ```bash
@@ -130,9 +136,10 @@ To take part in the competition, you first have to create an account on [Kaggle]
 
 The competition submission to Kaggle is fully automated. However, to make the automation work with your Kaggle account, you first have to save your credentials in GitHub. GitHub offers a way to safely store this information without giving anyone else access to it via its [secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). Start by opening your account settings on Kaggle, go to the **API** section and click on **Create New Token**. This will download a json file containing two keys: Your account username and an API key. Next, open your lsy_drone_racing GitHub repository in the browser and go to Settings -> Secrets and variables -> Actions
 
->**Note:** You have to select the repository settings, not your account settings
+> **Note:** You have to select the repository settings, not your account settings
 
 Here you add two new repository secrets using the information from the json file you downloaded:
+
 - Name: KaggleUsername Secret: INSERT_YOUR_USERNAME
 - Name: KaggleKey Secret: INSERT_YOUR_KEY
 
@@ -140,14 +147,13 @@ Here you add two new repository secrets using the information from the json file
 
 The whole point of the steps you just took was to set you up to use the GitHub action defined in your repository's [.github folder](/.github/workflows/test_solution.yml). This workflow runs every time you push changes to your repository's `main` or `master` branch. To prevent submitting every iteration of your code, you can create new branches and only merge them into the main branch once you finished your changes. However, we recommend regularly updating your main branch to see how fast you are and if the code runs without problems.
 
->**Note:** The competition will count your fastest average lap time. If a submission performed worse than a previous iteration, it won't update your standing.
+> **Note:** The competition will count your fastest average lap time. If a submission performed worse than a previous iteration, it won't update your standing.
 
->**Note:** The first time the test runs on your account, it will take longer than usual because it has to install all dependencies in GitHub. We cache this environment, so subsequent runs should be faster.
+> **Note:** The first time the test runs on your account, it will take longer than usual because it has to install all dependencies in GitHub. We cache this environment, so subsequent runs should be faster.
 
->**Warning:** Kaggle only accepts 100 submissions per day. While we really hope you don't make 100 commits in a single day, we do mention it just in case. 
+> **Warning:** Kaggle only accepts 100 submissions per day. While we really hope you don't make 100 commits in a single day, we do mention it just in case.
 
 Once you have pushed your latest iteration, a GitHub action runner will start testing your implementation. You can check the progress by clicking on the Actions tab of your repository. If the submission fails, you can check the errors. Please let us know if something is not working as intended. If you need additional packages for your project, please make sure to update the [environment.yaml](./environment.yaml) file accordingly. Otherwise, the tests will fail. If you want to get a more detailed summary of your performance, you can have a look at the test output directly:
-
 
 ## Creating your own controller
 
@@ -162,6 +168,7 @@ To deploy the controllers on real drones you must install ROS Noetic and the cra
 Create a catkin_ws/src folder if it does not exist already, clone the crazywarm package and build the workspace
 
 **TODO: CREATE WORKING CRAZYSWARM PACKAGE**
+
 ```bash
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws/src
@@ -173,6 +180,7 @@ source devel/setup.bash
 ```
 
 Next, paste the following block into your terminal
+
 ```bash
 cat <<EOF | sudo tee /etc/udev/rules.d/99-bitcraze.rules > /dev/null
 # Crazyradio (normal operation)
@@ -183,7 +191,6 @@ SUBSYSTEM=="usb", ATTRS{idVendor}=="1915", ATTRS{idProduct}=="0101", MODE="0664"
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE="0664", GROUP="plugdev"
 EOF
 ```
-
 
 ```bash
 # Install Vicon bridge nodelet
@@ -229,16 +236,19 @@ conda deactivate
 ### Common errors
 
 #### libNatNet
+
 If libNatNet is missing either during compiling crazyswarm or launching hover_swarm.launch, one option is to manually install it. Download the library from its [github repo](https://github.com/whoenig/NatNetSDKCrossplatform), follow the build instructions, and then add the library to your `LIBRARY_PATH` and `LD_LIBRARY_PATH` variables.
 
-### Fly with the drones 
+### Fly with the drones
 
 #### Settings
+
 Make sure you are familiar with the configuration files. Not all options are relevant depending on the motion capture setup. For more info, see the [official documentation](https://crazyswarm.readthedocs.io/en/latest/configuration.html#adjust-configuration-files).
 
 The important config files are located in the crazyswarm ROS package:
 
 **TODO:** Insert correct link to files
+
 - Crazyflies types — includes controller properties and marker configurations, etc.
 - In-use Crazyflies — includes ID, radio channel, types, etc.
 - All Crazyflies
@@ -250,9 +260,10 @@ As well as the launch file and Python script:
 
 #### Launch
 
->**Note:** The following is **NOT** within a conda environment, but has to run directly on the system's Python 3.8 installation. ROS has never heard of these best practices you speak of.
+> **Note:** The following is **NOT** within a conda environment, but has to run directly on the system's Python 3.8 installation. ROS has never heard of these best practices you speak of.
 
 In a terminal, launch the ROS node for the crazyflies. Change the settings in _<path/to/crazyswarm/package>/launch/crazyflies.yaml_ as necessary.
+
 ```bash
 roslaunch crazyswarm cf_sim2real.launch
 ```
@@ -264,5 +275,3 @@ python scripts/deploy.py --controller <path/to/your/controller.py> --config conf
 ```
 
 where `<path/to/your/controller.py>` implements a controller that inherits from `lsy_drone_racing.controller.BaseController`
-
-
